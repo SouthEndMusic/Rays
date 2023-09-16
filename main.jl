@@ -30,7 +30,7 @@ struct Camera
 end
 
 function Camera(loc, dir, up, screen_size, screen_dist, screen_res; warp = nothing)::Camera
-    right = [cross(dir_,up_) for (dir_, up_) in zip(dir, up)]
+    right = [cross(dir_, up_) for (dir_, up_) in zip(dir, up)]
 
     if isnothing(warp)
         warp = fill(identity, length(loc))
@@ -39,17 +39,22 @@ function Camera(loc, dir, up, screen_size, screen_dist, screen_res; warp = nothi
     return Camera(loc, dir, up, right, screen_size, screen_dist, screen_res, warp)
 end
 
-function look_at!(camera::Camera, cam_index::Int, from::Vector{Float64}, to::Vector{Float64})::Nothing
+function look_at!(
+    camera::Camera,
+    cam_index::Int,
+    from::Vector{Float64},
+    to::Vector{Float64},
+)::Nothing
     (; loc, dir, up, right) = camera
 
     loc[cam_index] = from
 
-    dir_ = normalize(to-from)
+    dir_ = normalize(to - from)
     dir_z = dir_[3]
     denom = sqrt(1 - dir_z^2)
 
     dir[cam_index] = dir_
-    up[cam_index] = -dir_z*dir_
+    up[cam_index] = -dir_z * dir_
     up[cam_index][3] += 1
     up[cam_index] /= denom
     right[cam_index] = cross(dir_, up[cam_index])
@@ -86,20 +91,20 @@ struct Menger_sponge <: Shape
     cubes::Vector{Cube}
 end
 
-function Menger_sponge(center::Vector{Float64},R::Float64, depth::Int)::Menger_sponge
+function Menger_sponge(center::Vector{Float64}, R::Float64, depth::Int)::Menger_sponge
     cubes = Cube[]
-    R_cube = R/3
+    R_cube = R / 3
 
-    for i in 1:3
-        for j in 1:3
-            for k in 1:3
-                m = countmap([i,j,k])
-                if 2 ∈ keys(m) && countmap([i,j,k])[2] > 1
+    for i = 1:3
+        for j = 1:3
+            for k = 1:3
+                m = countmap([i, j, k])
+                if 2 ∈ keys(m) && countmap([i, j, k])[2] > 1
                     continue
                 end
                 center_cube = zeros(3)
                 center_cube += center
-                center_cube += @. ([i,j,k] - 2) * 2 * R_cube
+                center_cube += @. ([i, j, k] - 2) * 2 * R_cube
 
                 cube = Cube(center_cube, R_cube)
                 push!(cubes, cube)
@@ -111,7 +116,7 @@ end
 
 function get_ray(camera::Camera, cam_index::Int, pixel_indices::Vector{Int})::Ray
     (; loc, dir, up, right, screen_size, screen_dist, screen_res, warp) = camera
-    
+
     loc = loc[cam_index]
     dir = dir[cam_index]
     up = up[cam_index]
@@ -126,8 +131,8 @@ function get_ray(camera::Camera, cam_index::Int, pixel_indices::Vector{Int})::Ra
     res_w, res_h = screen_res
 
     ray_loc = loc + screen_dist * dir
-    ray_loc += ((j-1)/(res_h-1) - 0.5) * s_h * up
-    ray_loc += ((i-1)/(res_w-1) - 0.5) * s_w * right
+    ray_loc += ((j - 1) / (res_h - 1) - 0.5) * s_h * up
+    ray_loc += ((i - 1) / (res_w - 1) - 0.5) * s_w * right
 
     ray_dir = ray_loc - loc
     normalize!(ray_dir)
@@ -137,26 +142,26 @@ function get_ray(camera::Camera, cam_index::Int, pixel_indices::Vector{Int})::Ra
     return Ray(ray_loc, ray_dir)
 end
 
-function intersect(ray::Ray, sphere::Sphere)::Tuple{Float64, NamedTuple}
+function intersect(ray::Ray, sphere::Sphere)::Tuple{Float64,NamedTuple}
     (; loc, dir) = ray
     (; center, Rsq) = sphere
 
     diff = loc - center
     a = norm(dir)^2
-    b = 2*dot(dir, diff)
+    b = 2 * dot(dir, diff)
     c = norm(diff)^2 - Rsq
     discr = b^2 - 4 * a * c
 
     t_int = if discr >= 0
-        t_int = (-b-sqrt(discr))/(2 * a)
-    else 
+        t_int = (-b - sqrt(discr)) / (2 * a)
+    else
         Inf
     end
 
     return t_int, (;)
 end
 
-function intersect(ray::Ray, cube::Cube)::Tuple{Float64, NamedTuple}
+function intersect(ray::Ray, cube::Cube)::Tuple{Float64,NamedTuple}
     (; loc, dir) = ray
     (; center, R) = cube
 
@@ -165,11 +170,11 @@ function intersect(ray::Ray, cube::Cube)::Tuple{Float64, NamedTuple}
     t_int = Inf
     dim_int = 0
 
-    for r in [-R,R]
-        for dim in 1:3
-            t_int_candidate = (diff[dim] + r)/dir[dim]
+    for r in [-R, R]
+        for dim = 1:3
+            t_int_candidate = (diff[dim] + r) / dir[dim]
             valid_candidate = true
-            for dim_other in 1:3
+            for dim_other = 1:3
                 if dim == dim_other
                     continue
                 end
@@ -190,7 +195,11 @@ function intersect(ray::Ray, cube::Cube)::Tuple{Float64, NamedTuple}
     return t_int, (; dim_int)
 end
 
-function intersect(ray::Ray, menger_sponge::Menger_sponge; current_depth:: Int = 0)::Tuple{Float64, NamedTuple}
+function intersect(
+    ray::Ray,
+    menger_sponge::Menger_sponge;
+    current_depth::Int = 0,
+)::Tuple{Float64,NamedTuple}
     t_int = Inf
     dim_int = 0
     cube_intersect = nothing
@@ -207,9 +216,10 @@ function intersect(ray::Ray, menger_sponge::Menger_sponge; current_depth:: Int =
 
     if !isnothing(cube_intersect) && current_depth < menger_sponge.depth
         t_int = Inf
-        loc_transformed = 3*(ray.loc + menger_sponge.center - cube_intersect.center)
+        loc_transformed = 3 * (ray.loc + menger_sponge.center - cube_intersect.center)
         ray_transformed = Ray(loc_transformed, ray.dir)
-        t_int_candidate, int_metadata = intersect(ray_transformed, menger_sponge; current_depth = current_depth + 1)
+        t_int_candidate, int_metadata =
+            intersect(ray_transformed, menger_sponge; current_depth = current_depth + 1)
         t_int_candidate /= 3.0
         if t_int_candidate < t_int
             dim_int = int_metadata.dim_int
@@ -221,30 +231,30 @@ function intersect(ray::Ray, menger_sponge::Menger_sponge; current_depth:: Int =
 end
 
 function shape_view(
-    camera::Camera, 
-    cam_index::Int, 
-    shape::Shape; 
-    collect_metadata::Dict{Symbol,DataType} = Dict{Symbol,DataType}()
-)::Tuple{Matrix{Float64}, Dict{Symbol, Matrix}}
+    camera::Camera,
+    cam_index::Int,
+    shape::Shape;
+    collect_metadata::Dict{Symbol,DataType} = Dict{Symbol,DataType}(),
+)::Tuple{Matrix{Float64},Dict{Symbol,Matrix}}
 
     (; screen_res) = camera
     screen_res = screen_res[cam_index]
 
     metadata = Dict{Symbol,Matrix}()
-    for (s,T) in collect_metadata
+    for (s, T) in collect_metadata
         metadata[s] = zeros(T, screen_res...)
     end
 
     canvas = get_canvas(camera, cam_index)
 
-    for i in 1:screen_res[1]
-        for j in 1:screen_res[2]
-            ray = get_ray(camera, cam_index, [i,j])
+    for i = 1:screen_res[1]
+        for j = 1:screen_res[2]
+            ray = get_ray(camera, cam_index, [i, j])
             t_int, int_metadata = intersect(ray, shape)
-            canvas[i,j] = t_int
+            canvas[i, j] = t_int
 
             for s in keys(collect_metadata)
-                metadata[s][i,j] = getfield(int_metadata, s)
+                metadata[s][i, j] = getfield(int_metadata, s)
             end
         end
     end
@@ -259,14 +269,14 @@ function cam_is_source(intersections::Matrix{Float64}, dropoff_curve; color = no
     t_max = maximum(t_intersect)
 
 
-    canvas = zeros(Float64,size(intersections)...)
+    canvas = zeros(Float64, size(intersections)...)
     canvas[where_intersect] = @. dropoff_curve(t_intersect)
 
     if !isnothing(color)
-        canvas_color = zeros(Float64,3,size(intersections)...)
+        canvas_color = zeros(Float64, 3, size(intersections)...)
 
-        for channel in 1:3
-            @. canvas_color[channel,:,:] = canvas * color[channel,:,:]
+        for channel = 1:3
+            @. canvas_color[channel, :, :] = canvas * color[channel, :, :]
         end
 
         canvas = canvas_color
@@ -277,23 +287,21 @@ end
 
 function get_blur_kernel(p::Float64)::Tuple{Vector{Float64},Int}
     i_max = Int(floor(p + 0.5))
-    kernel = zeros(2*i_max+1)
+    kernel = zeros(2 * i_max + 1)
 
     i = -i_max:i_max
-    arg_right = @. (i[2:end-1]+0.5)/p
-    arg_left = @. (i[2:end-1]-0.5)/p
+    arg_right = @. (i[2:end-1] + 0.5) / p
+    arg_left = @. (i[2:end-1] - 0.5) / p
 
-    kernel[2:end-1] = @. 15/16 * (
-        1/5  * (arg_right^5 - arg_left^5) +
-        -2/3 * (arg_right^3 - arg_left^3) +
+    kernel[2:end-1] = @. 15 / 16 * (
+        1 / 5 * (arg_right^5 - arg_left^5) +
+        -2 / 3 * (arg_right^3 - arg_left^3) +
         arg_right - arg_left
     )
 
-    x = (i_max - 0.5)/p
+    x = (i_max - 0.5) / p
 
-    c_outter = 0.5 - 15/16 * ( 
-        x^5 / 5 - 2 * x^3 / 3 + x
-    )
+    c_outter = 0.5 - 15 / 16 * (x^5 / 5 - 2 * x^3 / 3 + x)
 
     kernel[1] = c_outter
     kernel[end] = c_outter
@@ -301,26 +309,31 @@ function get_blur_kernel(p::Float64)::Tuple{Vector{Float64},Int}
     return kernel, i_max
 end
 
-function add_depth_of_field(canvas::Array{Float64,3}, t_int::Array{Float64,2}, focus_curve)::Array{Float64,3}
+function add_depth_of_field(
+    canvas::Array{Float64,3},
+    t_int::Array{Float64,2},
+    focus_curve,
+)::Array{Float64,3}
 
     _, w, h = size(canvas)
     canvas_new = zero(canvas)
 
-    for i in 1:w
-        for j in 1:h
-            if isinf(t_int[i,j])
+    for i = 1:w
+        for j = 1:h
+            if isinf(t_int[i, j])
                 continue
             end
-            focus = focus_curve(t_int[i,j])
+            focus = focus_curve(t_int[i, j])
             kernel, i_max = get_blur_kernel(focus)
-            for i_ in -i_max:i_max
-                for j_ in -i_max:i_max
+            for i_ = -i_max:i_max
+                for j_ = -i_max:i_max
                     i_abs = i + i_
                     j_abs = j + j_
                     if (i_abs < 1) || (i_abs > w) || (j_abs < 1) || (j_abs > h)
                         continue
                     end
-                    @. canvas_new[:,i_abs,j_abs] += canvas[:,i,j]*kernel[i_max + i_ + 1]*kernel[i_max + j_ + 1] 
+                    @. canvas_new[:, i_abs, j_abs] +=
+                        canvas[:, i, j] * kernel[i_max+i_+1] * kernel[i_max+j_+1]
                 end
             end
         end
@@ -343,17 +356,25 @@ function simple_view()
     screen_size = [0.2, 0.1]
     screen_dist = [0.2]
     screen_res = [1800, 900]
-    dropoff_curve(t) = clamp(1-0.3*(t-1),0,1)
-    focus_curve(t) = 0.5 + 20*abs(t-3)
+    dropoff_curve(t) = clamp(1 - 0.3 * (t - 1), 0, 1)
+    focus_curve(t) = 0.5 + 20 * abs(t - 3)
     function warp!(v::Vector{Float64})::Nothing
-        v[3] = v[3] + 0.1*sin(250*v[2])
-        v[1] = v[1] + 0.1*sin(250*v[2])
+        v[3] = v[3] + 0.1 * sin(250 * v[2])
+        v[1] = v[1] + 0.1 * sin(250 * v[2])
         return nothing
     end
-    cam = Camera([loc], [dir], [up], [screen_size], [screen_dist], [screen_res]; warp = [warp!])
+    cam = Camera(
+        [loc],
+        [dir],
+        [up],
+        [screen_size],
+        [screen_dist],
+        [screen_res];
+        warp = [warp!],
+    )
     look_at!(cam, 1, [2.0, 2.0, 2.0], zeros(3))
 
-    sphere = Sphere(zeros(3), 1.)
+    sphere = Sphere(zeros(3), 1.0)
     cube = Cube(zeros(3), 0.5)
     sponge = Menger_sponge(zeros(3), 0.5, 4)
 
@@ -361,10 +382,10 @@ function simple_view()
     t_int, metadata = shape_view(cam, 1, sponge; collect_metadata)
     dim_int = metadata[:dim_int]
     color = zeros(3, screen_res...)
-    for i in 1:screen_res[1]
-        for j in 1:screen_res[2]
-            dim_int_ = dim_int[i,j]
-            color[:,i,j] = if iszero(dim_int_)
+    for i = 1:screen_res[1]
+        for j = 1:screen_res[2]
+            dim_int_ = dim_int[i, j]
+            color[:, i, j] = if iszero(dim_int_)
                 zeros(3)
             else
                 julia_colors[dim_int_]
@@ -394,31 +415,39 @@ function warp_animation()
     screen_size = [0.1, 0.1]
     screen_dist = [0.2]
     screen_res = [1000, 1000]
-    dropoff_curve(t) = clamp(1-0.3*(t-1),0,1)
-    focus_curve(t) = 0.5 + 20*abs(t-3)
+    dropoff_curve(t) = clamp(1 - 0.3 * (t - 1), 0, 1)
+    focus_curve(t) = 0.5 + 20 * abs(t - 3)
     function warp!(v::Vector{Float64})::Nothing
-        v[3] = v[3] + 0.1*sin(250*v[2])
-        v[1] = v[1] + 0.1*sin(250*v[2])
+        v[3] = v[3] + 0.1 * sin(250 * v[2])
+        v[1] = v[1] + 0.1 * sin(250 * v[2])
         return nothing
     end
-    cam = Camera([loc], [dir], [up], [screen_size], [screen_dist], [screen_res]; warp = [warp!])
+    cam = Camera(
+        [loc],
+        [dir],
+        [up],
+        [screen_size],
+        [screen_dist],
+        [screen_res];
+        warp = [warp!],
+    )
     sponge = Menger_sponge(zeros(3), 0.5, 4)
 
     n_frames = 100
     framerate = 25
-    ϕ = π/3
+    ϕ = π / 3
     R = 4
 
-    encoder_options = (; crf=0)
+    encoder_options = (; crf = 0)
 
     open_video_out(
-        "C:/Users/bart1/Documents/Julia projects/Rays/Menger_sponge_spin.mp4", 
-        RGB{N0f8}, 
-        (screen_res...,), 
-        framerate = framerate, 
+        "C:/Users/bart1/Documents/Julia projects/Rays/Menger_sponge_spin.mp4",
+        RGB{N0f8},
+        (screen_res...,),
+        framerate = framerate,
         encoder_options = encoder_options,
     ) do writer
-        @showprogress "Computing frames..." for θ in range(π/6, 7π/6, n_frames)
+        @showprogress "Computing frames..." for θ in range(π / 6, 7π / 6, n_frames)
             x = cos(θ) * sin(ϕ)
             y = sin(θ) * sin(ϕ)
             z = cos(ϕ)
@@ -431,15 +460,15 @@ function warp_animation()
             collect_metadata = Dict(:dim_int => Int)
             t_int, metadata = shape_view(cam, 1, sponge; collect_metadata)
             color = zeros(3, screen_res...)
-            for channel in 1:3
+            for channel = 1:3
                 color_channel = view(color, channel, :, :)
-                @. color_channel[metadata[:dim_int] == channel] = 1.0
+                @. color_channel[metadata[:dim_int]==channel] = 1.0
             end
 
             canvas = cam_is_source(t_int, dropoff_curve; color)
             canvas = permutedims(canvas, [1, 3, 2])
             reverse!(canvas)
-            canvas = RGB{N0f8}.([canvas[channel, :, :] for channel in 1:3]...)
+            canvas = RGB{N0f8}.([canvas[channel, :, :] for channel = 1:3]...)
             write(writer, colorview(RGB, canvas))
         end
     end
