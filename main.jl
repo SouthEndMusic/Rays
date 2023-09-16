@@ -4,6 +4,20 @@ using VideoIO
 using ProgressMeter
 using StatsBase: countmap
 
+"""
+Struct for possibly multiple cameras. Per camera:
+loc: The location of the camera in space
+dir: The direction the camera is pointing (unit length)
+up: The upwards direction 
+right: The right direction
+screen_size: The size of the screen in world units
+screen_dist: The distance between loc and the image plane
+screen_res: The resolution of the resulting render
+warp: A function which changes the origin of rays as they leave the camera
+
+dir, up and right are orthormal and completely fix the location and
+position of the camera.
+"""
 struct Camera
     loc::Vector{Vector{Float64}}
     dir::Vector{Vector{Float64}}
