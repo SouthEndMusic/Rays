@@ -23,7 +23,7 @@ jobs:
             run: julia -e 'import Pkg; Pkg.add("JuliaFormatter")'
     
           - name: Format Code
-            run: julia -e 'using JuliaFormatter; format("path/to/your/code", verbose=true)'
+            run: julia -e 'using JuliaFormatter; format("*.jl", verbose=true)'
     
           - name: Commit Changes
             run: |
