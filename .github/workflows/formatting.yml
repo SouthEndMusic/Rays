@@ -1,0 +1,33 @@
+name: Format Code
+
+on:
+    push:
+        branches:
+            - main
+
+jobs:
+    format:
+        runs-on: ubuntu-latest
+        
+        steps:
+          - name: Checkout Repository
+            uses: actions/checkout@v2
+
+          - name: Set up Julia
+            uses: julia-actions/setup-julia@latest
+            with:
+              version: '1.8'
+
+          - name: Install JuliaFormatter
+            run: julia -e 'import Pkg; Pkg.add("JuliaFormatter")'
+    
+          - name: Format Code
+            run: julia -e 'using JuliaFormatter; format("path/to/your/code", verbose=true)'
+    
+          - name: Commit Changes
+            run: |
+                git config --local user.email "actions@github.com"
+                git config --local user.name "GitHub Actions"
+                git add .
+                git commit -m "Format code"
+                git push
