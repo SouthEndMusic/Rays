@@ -322,9 +322,18 @@ function shape_view(
 end
 
 """
-
+First create a grayscale canvas of the intersection times using the dropoff_curve;
+this curve which maps positive numbers to [0,1] determines the brightness of a pixel
+based on its distance to the camera. 
+If a color Array{Float64,3} is provided this is multiplied by the grayscale canvas to
+produce a colored image with varying brightness.
 """
-function cam_is_source(intersections::Matrix{Float64}, dropoff_curve; color = nothing)::Array{Float64}
+function cam_is_source(
+    intersections::Matrix{Float64},
+    dropoff_curve;
+    color::Union{Array{Float64,3},Nothing} = nothing,
+)::Array{Float64}
+
     where_intersect = .!isinf.(intersections)
     t_intersect = intersections[where_intersect]
 
@@ -369,6 +378,11 @@ function get_blur_kernel(p::Float64)::Tuple{Vector{Float64},Int}
     return kernel, i_max
 end
 
+"""
+The depth of field effect is created by applying a kernel to pixel to 
+'smear out' its value over the neighbouring pixels, where the spread
+is given by the focus curve at the intersection time at that pixel.
+"""
 function add_depth_of_field(
     canvas::Array{Float64,3},
     t_int::Array{Float64,2},
