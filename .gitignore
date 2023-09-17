@@ -1,3 +1,6 @@
 # Output files
 *.mp4
 *.png
+
+# Manifest
+/core/Manifest.toml

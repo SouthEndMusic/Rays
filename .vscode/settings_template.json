@@ -1,0 +1,6 @@
+{
+    "[julia]": {
+        "editor.formatOnSave": true
+    },
+    "julia.environmentPath": "core"
+}
