@@ -29,6 +29,10 @@ struct Camera
     warp::Vector{Function}
 end
 
+"""
+Construct a camera object where the right vectors are computed using the cross product
+and warp functions are optional.
+"""
 function Camera(loc, dir, up, screen_size, screen_dist, screen_res; warp = nothing)::Camera
     right = [cross(dir_, up_) for (dir_, up_) in zip(dir, up)]
 
@@ -39,6 +43,12 @@ function Camera(loc, dir, up, screen_size, screen_dist, screen_res; warp = nothi
     return Camera(loc, dir, up, right, screen_size, screen_dist, screen_res, warp)
 end
 
+"""
+Point the camera with the given cam_index from 'from' to 'to'. 
+'up' is defined to be a linear combination of e_z = [0,0,1] and dir
+of unit length and orthogonal to dir. This does not work if dir and e_z are proportional,
+e.g. the camera points straight up or straight down.
+"""
 function look_at!(
     camera::Camera,
     cam_index::Int,
@@ -53,6 +63,10 @@ function look_at!(
     dir_z = dir_[3]
     denom = sqrt(1 - dir_z^2)
 
+    if denom ≈ 0.0
+        error("In 'look_at!', the camera cannot point straight up or down.")
+    end
+
     dir[cam_index] = dir_
     up[cam_index] = -dir_z * dir_
     up[cam_index][3] += 1
@@ -62,8 +76,15 @@ function look_at!(
     return nothing
 end
 
+"""
+Get a Matrix{Float64} with the resolution of the provided camera.
+"""
 get_canvas(camera::Camera, cam_index::Int) = zeros(Float64, camera.screen_res[cam_index]...)
 
+"""
+loc: The origin of the ray 
+dir: The direction of the ray (unit vector)
+"""
 struct Ray
     loc::Vector{Float64}
     dir::Vector{Float64}
@@ -84,6 +105,11 @@ struct Cube <: Shape
     R::Float64
 end
 
+"""
+The Menger sponge struct is similar to the Cube struct but has 2 extra fields:
+depth: The recursion depth of the Menger sponge fractal
+cubes: The subcubes the largest cube consists of, e.g. 1 recursion step
+"""
 struct Menger_sponge <: Shape
     center::Vector{Float64}
     R::Float64
@@ -91,6 +117,10 @@ struct Menger_sponge <: Shape
     cubes::Vector{Cube}
 end
 
+"""
+Create a Menger sponge of given location, size and recursion depth
+with the 'cubes' array automatically generated.
+"""
 function Menger_sponge(center::Vector{Float64}, R::Float64, depth::Int)::Menger_sponge
     cubes = Cube[]
     R_cube = R / 3
@@ -114,6 +144,11 @@ function Menger_sponge(center::Vector{Float64}, R::Float64, depth::Int)::Menger_
     return Menger_sponge(center, R, depth, cubes)
 end
 
+"""
+Compute the location and direction of a ray emited from the camera for 
+the given pixel indices.
+If a warp function is provided, this function is applied to the ray location.
+"""
 function get_ray(camera::Camera, cam_index::Int, pixel_indices::Vector{Int})::Ray
     (; loc, dir, up, right, screen_size, screen_dist, screen_res, warp) = camera
 
@@ -124,7 +159,11 @@ function get_ray(camera::Camera, cam_index::Int, pixel_indices::Vector{Int})::Ra
     screen_size = screen_size[cam_index]
     screen_dist = screen_dist[cam_index][1]
     screen_res = screen_res[cam_index]
-    warp = warp[cam_index]
+    warp! = warp[cam_index]
+
+    if !all(pixel_indices .<= screen_res)
+        error("Pixel indices must fall inside screen res $screen_res, got $pixel_indices.")
+    end
 
     i, j = pixel_indices
     s_w, s_h = screen_size
@@ -137,11 +176,15 @@ function get_ray(camera::Camera, cam_index::Int, pixel_indices::Vector{Int})::Ra
     ray_dir = ray_loc - loc
     normalize!(ray_dir)
 
-    warp(ray_loc)
+    warp!(ray_loc)
 
     return Ray(ray_loc, ray_dir)
 end
 
+"""
+Compute the intersection of a ray with a sphere as the smallest
+real solution to a quadratic polynomial, if it exists.
+"""
 function intersect(ray::Ray, sphere::Sphere)::Tuple{Float64,NamedTuple}
     (; loc, dir) = ray
     (; center, Rsq) = sphere
@@ -161,6 +204,10 @@ function intersect(ray::Ray, sphere::Sphere)::Tuple{Float64,NamedTuple}
     return t_int, (;)
 end
 
+"""
+Compute the intersection of a ray with a cube by computing the intersections
+with each of the 6 face planes and then checking whether the intersection is within the face.
+"""
 function intersect(ray::Ray, cube::Cube)::Tuple{Float64,NamedTuple}
     (; loc, dir) = ray
     (; center, R) = cube
@@ -195,6 +242,11 @@ function intersect(ray::Ray, cube::Cube)::Tuple{Float64,NamedTuple}
     return t_int, (; dim_int)
 end
 
+"""
+Compute the intersection of a ray with a Menger sponge.
+This is done recursively until the recursion depth of the Menger sponge.
+To compute the intersection of a ray with a sub-cube, the ray location is transformed.
+"""
 function intersect(
     ray::Ray,
     menger_sponge::Menger_sponge;
@@ -245,13 +297,13 @@ function shape_view(
         metadata[s] = zeros(T, screen_res...)
     end
 
-    canvas = get_canvas(camera, cam_index)
+    t_int = get_canvas(camera, cam_index)
 
     for i = 1:screen_res[1]
         for j = 1:screen_res[2]
             ray = get_ray(camera, cam_index, [i, j])
-            t_int, int_metadata = intersect(ray, shape)
-            canvas[i, j] = t_int
+            t_int_, int_metadata = intersect(ray, shape)
+            t_int[i, j] = t_int_
 
             for s in keys(collect_metadata)
                 metadata[s][i, j] = getfield(int_metadata, s)
@@ -259,7 +311,7 @@ function shape_view(
         end
     end
 
-    return canvas, metadata
+    return t_int, metadata
 end
 
 function cam_is_source(intersections::Matrix{Float64}, dropoff_curve; color = nothing)
