@@ -7,7 +7,7 @@ using StatsBase: countmap
 """
 Struct for possibly multiple cameras. Per camera:
 loc: The location of the camera in space
-dir: The direction the camera is pointing (unit length)
+dir: The direction the camera is pointing in (vector of unit length)
 up: The upwards direction 
 right: The right direction
 screen_size: The size of the screen in world units
@@ -15,8 +15,7 @@ screen_dist: The distance between loc and the image plane
 screen_res: The resolution of the resulting render
 warp: A function which changes the origin of rays as they leave the camera
 
-dir, up and right are orthormal and completely fix the location and
-position of the camera.
+dir, up and right are orthormal and completely fix the orientation of the camera.
 """
 struct Camera
     loc::Vector{Vector{Float64}}
@@ -30,7 +29,7 @@ struct Camera
 end
 
 """
-Construct a camera object where the right vectors are computed using the cross product
+Construct a camera object where the 'right' vectors are computed using the cross product
 and warp functions are optional.
 """
 function Camera(loc, dir, up, screen_size, screen_dist, screen_res; warp = nothing)::Camera
@@ -45,8 +44,8 @@ end
 
 """
 Point the camera with the given cam_index from 'from' to 'to'. 
-'up' is defined to be a linear combination of e_z = [0,0,1] and dir
-of unit length and orthogonal to dir. This does not work if dir and e_z are proportional,
+'up' is defined to be a linear combination of unit length of
+e_z = [0,0,1] and di,r and orthogonal to dir. This does not work if dir and e_z are proportional,
 e.g. the camera points straight up or straight down.
 """
 function look_at!(
@@ -285,7 +284,7 @@ end
 """
 Create a Matrix{Float64} with intersection times of a shape per pixel.
 If there is no intersection the intersection time is Inf.
-Depending on the type of object, metadata of the intersections can be collected;
+Depending on the type of object, metadata of the intersections can be collected,
 for instance the intersection dimension for cubes.
 """
 function shape_view(
@@ -325,7 +324,7 @@ end
 First create a grayscale canvas of the intersection times using the dropoff_curve;
 this curve which maps positive numbers to [0,1] determines the brightness of a pixel
 based on its distance to the camera. 
-If a color Array{Float64,3} is provided this is multiplied by the grayscale canvas to
+If a color Array{Float64,3} is provided, this is multiplied by the grayscale canvas to
 produce a colored image with varying brightness.
 """
 function cam_is_source(
@@ -354,6 +353,12 @@ function cam_is_source(
     return canvas
 end
 
+"""
+Create a discrete distribution where the spread is based on p.
+The distribution is based on integrating over pixels [i-1/2,i+1/2] ∩ [-p,p]
+the continuous distribution 
+f(x) = 15/16 (x^2-1)^2, x ∈ [-p,p].
+"""
 function get_blur_kernel(p::Float64)::Tuple{Vector{Float64},Int}
     i_max = Int(floor(p + 0.5))
     kernel = zeros(2 * i_max + 1)
