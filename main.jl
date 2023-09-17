@@ -282,6 +282,12 @@ function intersect(
     return t_int, (; dim_int)
 end
 
+"""
+Create a Matrix{Float64} with intersection times of a shape per pixel.
+If there is no intersection the intersection time is Inf.
+Depending on the type of object, metadata of the intersections can be collected;
+for instance the intersection dimension for cubes.
+"""
 function shape_view(
     camera::Camera,
     cam_index::Int,
@@ -306,6 +312,7 @@ function shape_view(
             t_int[i, j] = t_int_
 
             for s in keys(collect_metadata)
+                # TODO: Create a custom error for when the required metadata does not exist
                 metadata[s][i, j] = getfield(int_metadata, s)
             end
         end
@@ -314,16 +321,17 @@ function shape_view(
     return t_int, metadata
 end
 
-function cam_is_source(intersections::Matrix{Float64}, dropoff_curve; color = nothing)
+"""
+
+"""
+function cam_is_source(intersections::Matrix{Float64}, dropoff_curve; color = nothing)::Array{Float64}
     where_intersect = .!isinf.(intersections)
     t_intersect = intersections[where_intersect]
-    t_min = minimum(t_intersect)
-    t_max = maximum(t_intersect)
-
 
     canvas = zeros(Float64, size(intersections)...)
     canvas[where_intersect] = @. dropoff_curve(t_intersect)
 
+    # TODO: Move this to separate function for coloring
     if !isnothing(color)
         canvas_color = zeros(Float64, 3, size(intersections)...)
 
