@@ -1,4 +1,7 @@
 using Rays
+using Images
+using ProgressMeter
+using VideoIO
 
 # Simple cube and sphere view
 function simple_view()
@@ -56,11 +59,11 @@ function simple_view()
     canvas = permutedims(canvas, [1, 3, 2])
     reverse!(canvas)
 
-    Rays.colorview(Rays.RGB, canvas)
+    colorview(RGB, canvas)
 end
 
 # Making animation
-function warp_animation()
+function rotation_animation()
     julia_green = [0.22, 0.596, 0.149]
     julia_purple = [0.584, 0.345, 0.698]
     julia_red = [0.796, 0.235, 0.2]
@@ -72,7 +75,7 @@ function warp_animation()
     up = zeros(3)
     screen_size = [0.1, 0.1]
     screen_dist = [0.2]
-    screen_res = [1000, 1000]
+    screen_res = [250, 250]
     dropoff_curve(t) = clamp(1 - 0.3 * (t - 1), 0, 1)
     focus_curve(t) = 0.5 + 20 * abs(t - 3)
     function warp!(v::Vector{Float64})::Nothing
@@ -80,7 +83,7 @@ function warp_animation()
         v[1] = v[1] + 0.1 * sin(250 * v[2])
         return nothing
     end
-    cam = Camera(
+    cam = Rays.Camera(
         [loc],
         [dir],
         [up],
@@ -89,23 +92,23 @@ function warp_animation()
         [screen_res];
         warp = [warp!],
     )
-    sponge = Menger_sponge(zeros(3), 0.5, 4)
+    sponge = Rays.Menger_sponge(zeros(3), 0.5, 4)
 
-    n_frames = 100
-    framerate = 25
+    n_frames = 50
+    framerate = 10
     ϕ = π / 3
     R = 4
 
     encoder_options = (; crf = 0)
 
     open_video_out(
-        "C:/Users/bart1/Documents/Julia projects/Rays/Menger_sponge_spin.mp4",
+        normpath(@__DIR__, "Menger_sponge_spin.mp4"),
         RGB{N0f8},
         (screen_res...,),
         framerate = framerate,
         encoder_options = encoder_options,
     ) do writer
-        Rays.@showprogress "Computing frames..." for θ in range(π / 6, 7π / 6, n_frames)
+        @showprogress "Computing frames..." for θ in range(π / 6, 7π / 6, n_frames)
             x = cos(θ) * sin(ϕ)
             y = sin(θ) * sin(ϕ)
             z = cos(ϕ)
@@ -113,17 +116,24 @@ function warp_animation()
             from = R * [x, y, z]
             to = zeros(3)
 
-            look_at!(cam, 1, from, to)
+            Rays.look_at!(cam, 1, from, to)
 
             collect_metadata = Dict(:dim_int => Int)
-            t_int, metadata = shape_view(cam, 1, sponge; collect_metadata)
+            t_int, metadata = Rays.shape_view(cam, 1, sponge; collect_metadata)
             color = zeros(3, screen_res...)
-            for channel = 1:3
-                color_channel = view(color, channel, :, :)
-                @. color_channel[metadata[:dim_int]==channel] = 1.0
+            dim_int = metadata[:dim_int]
+            for i = 1:screen_res[1]
+                for j = 1:screen_res[2]
+                    dim_int_ = dim_int[i, j]
+                    color[:, i, j] = if iszero(dim_int_)
+                        zeros(3)
+                    else
+                        julia_colors[dim_int_]
+                    end
+                end
             end
 
-            canvas = cam_is_source(t_int, dropoff_curve; color)
+            canvas = Rays.cam_is_source(t_int, dropoff_curve; color)
             canvas = permutedims(canvas, [1, 3, 2])
             reverse!(canvas)
             canvas = RGB{N0f8}.([canvas[channel, :, :] for channel = 1:3]...)
@@ -131,5 +141,3 @@ function warp_animation()
         end
     end
 end
-
-simple_view()
