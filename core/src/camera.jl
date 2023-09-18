@@ -37,6 +37,16 @@ function Camera(loc, dir, up, screen_size, screen_dist, screen_res; warp = nothi
 end
 
 """
+Get a trivial camera instance
+"""
+function Camera(len::Int)::Camera
+    default_values =
+        [zeros(3), [1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.1, 0.1], [0.1], [100, 100]]
+    return Camera([fill(default_value, len) for default_value in default_values]...)
+end
+
+
+"""
 Point the camera with the given cam_index from 'from' to 'to'. 
 'up' is defined to be a linear combination of unit length of
 e_z = [0,0,1] and di,r and orthogonal to dir. This does not work if dir and e_z are proportional,
@@ -100,7 +110,7 @@ function get_ray(camera::Camera, cam_index::Int, pixel_indices::Vector{Int})::Ra
     screen_res = screen_res[cam_index]
     warp! = warp[cam_index]
 
-    if !all(pixel_indices .<= screen_res)
+    if !(all(pixel_indices .> 0) && all(pixel_indices .<= screen_res))
         error("Pixel indices must fall inside screen res $screen_res, got $pixel_indices.")
     end
 
