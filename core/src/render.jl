@@ -77,12 +77,12 @@ the continuous distribution
 f(x) = 15/16 (x^2-1)^2, x ∈ [-p,p].
 """
 function get_blur_kernel(p::Float64)::Tuple{Vector{Float64},Int}
-    i_max = Int(floor(p + 0.5))
-    kernel = zeros(2 * i_max + 1)
+    Δi_max = Int(floor(p + 0.5))
+    kernel = zeros(2 * Δi_max + 1)
 
-    i = -i_max:i_max
-    arg_right = @. (i[2:end-1] + 0.5) / p
-    arg_left = @. (i[2:end-1] - 0.5) / p
+    Δi = -Δi_max:Δi_max
+    arg_right = @. (Δi[2:end-1] + 0.5) / p
+    arg_left = @. (Δi[2:end-1] - 0.5) / p
 
     kernel[2:end-1] = @. 15 / 16 * (
         1 / 5 * (arg_right^5 - arg_left^5) +
@@ -90,14 +90,13 @@ function get_blur_kernel(p::Float64)::Tuple{Vector{Float64},Int}
         arg_right - arg_left
     )
 
-    x = (i_max - 0.5) / p
-
+    x = (Δi_max - 0.5) / p
     c_outter = 0.5 - 15 / 16 * (x^5 / 5 - 2 * x^3 / 3 + x)
 
     kernel[1] = c_outter
     kernel[end] = c_outter
 
-    return kernel, i_max
+    return kernel, Δi_max
 end
 
 """
@@ -120,11 +119,11 @@ function add_depth_of_field(
                 continue
             end
             focus = focus_curve(t_int[i, j])
-            kernel, i_max = get_blur_kernel(focus)
-            for i_ = -i_max:i_max
-                for j_ = -i_max:i_max
-                    i_abs = i + i_
-                    j_abs = j + j_
+            kernel, Δi_max = get_blur_kernel(focus)
+            for Δi = -Δi_max:Δi_max
+                for Δj = -Δi_max:Δi_max
+                    i_abs = i + Δi
+                    j_abs = j + Δj
                     if (i_abs < 1) || (i_abs > w) || (j_abs < 1) || (j_abs > h)
                         continue
                     end

@@ -16,7 +16,7 @@ function simple_view()
     up = zeros(3)
     screen_size = [0.1, 0.1]
     screen_dist = [0.2]
-    screen_res = [450,450]
+    screen_res = [450, 450]
     dropoff_curve(t) = clamp(1 - 0.3 * (t - 1), 0, 1)
     focus_curve(t) = 0.5 + 20 * abs(t - 3)
     function warp!(v::Vector{Float64})::Nothing
