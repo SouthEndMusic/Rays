@@ -21,9 +21,18 @@ using LinearAlgebra: normalize!
 end
 
 @testset "Cube" begin
+    center = [0.0,2.0,0.0]
+    R = 0.5
+    cube = Rays.Cube(center,R)
+    @test cube isa Rays.Cube
 
-end
-
-@testset "Menger sponge" begin
-
+    loc = zeros(3)
+    dir = [0.0, 1.0, 0.0]
+    normalize!(dir)   
+    ray = Rays.Ray(loc, dir)
+    
+    t_int, int_metadata = Rays.intersect(ray, cube)
+    @test t_int ≈ 1.5
+    @test haskey(int_metadata, :dim_int)
+    @test int_metadata.dim_int == 2
 end
