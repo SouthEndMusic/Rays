@@ -42,7 +42,7 @@ end
 
 @testset "get ray" begin
     camera = Rays.Camera(1)
-    camera.screen_res[1] = [100,100]
+    camera.screen_res[1] = [100, 100]
 
     from = [0.61499727, 0.9667763, 0.1495682]
     to = [0.87458175, 0.4226909, 0.0016991668]
