@@ -1,4 +1,5 @@
 abstract type Shape end
+abstract type TriangleShape <: Shape end
 
 struct Sphere <: Shape
     center::Vector{Float64}
@@ -50,6 +51,38 @@ function Menger_sponge(center::Vector{Float64}, R::Float64, depth::Int)::Menger_
         end
     end
     return Menger_sponge(center, R, depth, cubes)
+end
+
+struct GeneralTriangleShape <: TriangleShape
+    vertices::Matrix{Float64} # (n_vertices, 3)
+    faces::Matrix{Int} # (n_faces, 3)
+    n_vertices::Int
+    n_faces::Int
+end
+
+struct ConvexTriangleShape <: TriangleShape
+    vertices::Matrix{Float64} # (n_vertices, 3)
+    faces::Matrix{Int} # (n_faces, 3)
+    n_vertices::Int
+    n_faces::Int
+end
+
+function Tetrahedron(center::Vector{Float64}, R::Float64)::ConvexTriangleShape
+    vertices = zeros(4, 3)
+    vertices[4, :] .= center + [0.0, 0.0, R]
+
+    ϕ = 2π / 3
+    for (i, θ) in enumerate(range(0, 2π, 4)[1:end-1])
+        @. vertices[i, :] = center + R * [
+            cos(θ) * sin(ϕ)
+            sin(θ) * sin(ϕ)
+            cos(ϕ)
+        ]
+    end
+
+    faces = collect(transpose(hcat(collect(combinations(1:4, 3))...)))
+
+    return ConvexTriangleShape(vertices, faces, 4, 4)
 end
 
 
@@ -152,4 +185,43 @@ function intersect(
     end
 
     return t_int, (; dim_int)
+end
+
+function intersect(ray::Ray, triangle_vertices::Vector{Vector{Float64}})::Float64
+    (; loc, dir) = ray
+
+    v1 = triangle_vertices[1] - triangle_vertices[3]
+    v2 = triangle_vertices[2] - triangle_vertices[3]
+
+    M = zeros(3, 3)
+    M[:, 1] = v1
+    M[:, 2] = v2
+    M[:, 3] = -dir
+
+    y = loc - triangle_vertices[3]
+    sol = M \ y
+
+    return if all(sol .>= 0.0) && (sol[1] + sol[2] <= 1.0)
+        sol[3]
+    else
+        Inf
+    end
+end
+
+function intersect(ray::Ray, shape::TriangleShape)::Tuple{Float64,NamedTuple}
+    (; vertices, faces) = shape
+
+    t_int = Inf
+    face_int = 0
+
+    for i = 1:shape.n_faces
+        triangle_vertices = [vertices[j, :] for j in faces[i, :]]
+        t_int_candidate = intersect(ray, triangle_vertices)
+        if t_int_candidate < t_int
+            t_int = t_int_candidate
+            face_int = i
+        end
+    end
+
+    return t_int, (; face_int)
 end
