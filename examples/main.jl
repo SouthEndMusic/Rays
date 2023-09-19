@@ -3,7 +3,7 @@ using Images
 using ProgressMeter
 using VideoIO
 
-function pyramid_view()
+function Sierpinski_pyramid_view()
     julia_blue = [0.251, 0.388, 0.847]
     julia_green = [0.22, 0.596, 0.149]
     julia_purple = [0.584, 0.345, 0.698]
@@ -12,14 +12,14 @@ function pyramid_view()
     julia_colors = [julia_blue, julia_green, julia_purple, julia_red]
 
     camera = Rays.Camera(1)
-    camera.screen_res[1] = [250, 250]
+    camera.screen_res[1] = [1000, 1000]
     camera.screen_dist[1] = [1.0]
     from = [-5.0, -5.0, 5.0]
     to = zeros(3)
     Rays.look_at!(camera, 1, from, to)
-    dropoff_curve(t) = clamp(7.0 - 1.0 * (t - 1), 0, 1.0)
+    dropoff_curve(t) = clamp(7.0 - 0.9 * (t - 1), 0, 1.0)
 
-    tetrahedron = Rays.Tetrahedron(zeros(3), 0.5)
+    tetrahedron = Rays.Sierpinski_pyramid(zeros(3), 0.5, 4)
     collect_metadata = Dict(:face_int => Int)
     t_int, metadata = Rays.shape_view(camera, 1, tetrahedron; collect_metadata)
 

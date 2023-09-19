@@ -128,7 +128,7 @@ function add_depth_of_field(
                         continue
                     end
                     @. canvas_new[:, i_abs, j_abs] +=
-                        canvas[:, i, j] * kernel[Δi_max + Δi + 1] * kernel[Δi_max + Δj + 1]
+                        canvas[:, i, j] * kernel[Δi_max+Δi+1] * kernel[Δi_max+Δj+1]
                 end
             end
         end

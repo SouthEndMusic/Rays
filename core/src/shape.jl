@@ -30,8 +30,8 @@ Create a Menger sponge of given location, size and recursion depth
 with the 'cubes' array automatically generated.
 """
 function Menger_sponge(center::Vector{Float64}, R::Float64, depth::Int)::FractalShape
-    cubes = Cube[]
-    R_cube = R / 3
+    subcubes = Cube[]
+    R_subcube = R / 3
 
     for i = 1:3
         for j = 1:3
@@ -40,21 +40,22 @@ function Menger_sponge(center::Vector{Float64}, R::Float64, depth::Int)::Fractal
                 if 2 ∈ keys(m) && countmap([i, j, k])[2] > 1
                     continue
                 end
-                center_cube = zeros(3)
-                center_cube += center
-                center_cube += @. ([i, j, k] - 2) * 2 * R_cube
+                center_subcube = zeros(3)
+                center_subcube += center
+                center_subcube += @. ([i, j, k] - 2) * 2 * R_subcube
 
-                cube = Cube(center_cube, R_cube)
-                push!(cubes, cube)
+                subcube = Cube(center_subcube, R_subcube)
+                push!(subcubes, subcube)
             end
         end
     end
-    return FractalShape(center, depth, 3.0, cubes)
+    return FractalShape(center, depth, 3.0, subcubes)
 end
 
 struct GeneralTriangleShape <: TriangleShape
     vertices::Matrix{Float64} # (n_vertices, 3)
     faces::Matrix{Int} # (n_faces, 3)
+    center::Vector{Float64}
     n_vertices::Int
     n_faces::Int
 end
@@ -64,6 +65,7 @@ default_metadata(::Val{GeneralTriangleShape}) = (; face_int = 0)
 struct ConvexTriangleShape <: TriangleShape
     vertices::Matrix{Float64} # (n_vertices, 3)
     faces::Matrix{Int} # (n_faces, 3)
+    center::Vector{Float64}
     n_vertices::Int
     n_faces::Int
 end
@@ -85,7 +87,21 @@ function Tetrahedron(center::Vector{Float64}, R::Float64)::ConvexTriangleShape
 
     faces = collect(transpose(hcat(collect(combinations(1:4, 3))...)))
 
-    return ConvexTriangleShape(vertices, faces, 4, 4)
+    return ConvexTriangleShape(vertices, faces, center, 4, 4)
+end
+
+function Sierpinski_pyramid(center::Vector{Float64}, R::Float64, depth::Int)::FractalShape
+    subtetrahedra = ConvexTriangleShape[]
+    R_subtetrahedron = R / 2
+
+    tetrahedron_main = Tetrahedron(center, R)
+    for i = 1:4
+        subtetrahedron =
+            Tetrahedron(center + tetrahedron_main.vertices[i, :] / 2, R_subtetrahedron)
+        push!(subtetrahedra, subtetrahedron)
+    end
+
+    return FractalShape(center, depth, 2.0, subtetrahedra)
 end
 
 
@@ -179,8 +195,7 @@ function intersect(
     if !isnothing(subshape_intersect) && current_depth < depth
         t_int = Inf
         loc_transformed =
-            shrink_factor *
-            (ray.loc + fractal_shape.center - subshape_intersect.center)
+            shrink_factor * (ray.loc + fractal_shape.center - subshape_intersect.center)
         ray_transformed = Ray(loc_transformed, ray.dir)
         t_int_candidate, metadata_int_candidate =
             intersect(ray_transformed, fractal_shape; current_depth = current_depth + 1)
