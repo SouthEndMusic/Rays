@@ -1,5 +1,6 @@
 abstract type Shape end
 abstract type TriangleShape <: Shape end
+default_metadata(shape_type::Shape) = default_metadata(Val(typeof(shape_type)))
 
 struct Sphere <: Shape
     center::Vector{Float64}
@@ -7,6 +8,7 @@ struct Sphere <: Shape
     Rsq::Float64
 end
 
+default_metadata(::Val{Sphere}) = (;)
 Sphere(center::Vector{Float64}, R::Float64) = Sphere(center, R, R^2)
 
 struct Cube <: Shape
@@ -14,23 +16,20 @@ struct Cube <: Shape
     R::Float64
 end
 
-"""
-The Menger sponge struct is similar to the Cube struct but has 2 extra fields:
-depth: The recursion depth of the Menger sponge fractal
-cubes: The subcubes the largest cube consists of, e.g. 1 recursion step
-"""
-struct Menger_sponge <: Shape
+default_metadata(::Val{Cube}) = (; dim_int = 0)
+
+struct FractalShape{T<:Shape} <: Shape
     center::Vector{Float64}
-    R::Float64
     depth::Int
-    cubes::Vector{Cube}
+    shrink_factor::Float64
+    subshapes::Vector{T}
 end
 
 """
 Create a Menger sponge of given location, size and recursion depth
 with the 'cubes' array automatically generated.
 """
-function Menger_sponge(center::Vector{Float64}, R::Float64, depth::Int)::Menger_sponge
+function Menger_sponge(center::Vector{Float64}, R::Float64, depth::Int)::FractalShape
     cubes = Cube[]
     R_cube = R / 3
 
@@ -50,7 +49,7 @@ function Menger_sponge(center::Vector{Float64}, R::Float64, depth::Int)::Menger_
             end
         end
     end
-    return Menger_sponge(center, R, depth, cubes)
+    return FractalShape(center, depth, 3.0, cubes)
 end
 
 struct GeneralTriangleShape <: TriangleShape
@@ -60,12 +59,16 @@ struct GeneralTriangleShape <: TriangleShape
     n_faces::Int
 end
 
+default_metadata(::Val{GeneralTriangleShape}) = (; face_int = 0)
+
 struct ConvexTriangleShape <: TriangleShape
     vertices::Matrix{Float64} # (n_vertices, 3)
     faces::Matrix{Int} # (n_faces, 3)
     n_vertices::Int
     n_faces::Int
 end
+
+default_metadata(::Val{ConvexTriangleShape}) = (; face_int = 0)
 
 function Tetrahedron(center::Vector{Float64}, R::Float64)::ConvexTriangleShape
     vertices = zeros(4, 3)
@@ -154,37 +157,41 @@ To compute the intersection of a ray with a sub-cube, the ray location is transf
 """
 function intersect(
     ray::Ray,
-    menger_sponge::Menger_sponge;
+    fractal_shape::FractalShape;
     current_depth::Int = 0,
 )::Tuple{Float64,NamedTuple}
+    (; subshapes, depth, shrink_factor) = fractal_shape
+
     t_int = Inf
-    dim_int = 0
-    cube_intersect = nothing
+    metadata_int = default_metadata(first(subshapes))
+    subshape_intersect = nothing
 
-    for cube in menger_sponge.cubes
-        t_int_candidate, int_metadata = intersect(ray, cube)
+    for subshape in subshapes
+        t_int_candidate, metadata_int_candidate = intersect(ray, subshape)
 
         if t_int_candidate < t_int
-            cube_intersect = cube
+            subshape_intersect = subshape
             t_int = t_int_candidate
-            dim_int = int_metadata.dim_int
+            metadata_int = metadata_int_candidate
         end
     end
 
-    if !isnothing(cube_intersect) && current_depth < menger_sponge.depth
+    if !isnothing(subshape_intersect) && current_depth < depth
         t_int = Inf
-        loc_transformed = 3 * (ray.loc + menger_sponge.center - cube_intersect.center)
+        loc_transformed =
+            shrink_factor *
+            (ray.loc + fractal_shape.center - subshape_intersect.center)
         ray_transformed = Ray(loc_transformed, ray.dir)
-        t_int_candidate, int_metadata =
-            intersect(ray_transformed, menger_sponge; current_depth = current_depth + 1)
-        t_int_candidate /= 3.0
+        t_int_candidate, metadata_int_candidate =
+            intersect(ray_transformed, fractal_shape; current_depth = current_depth + 1)
+        t_int_candidate /= shrink_factor
         if t_int_candidate < t_int
-            dim_int = int_metadata.dim_int
             t_int = t_int_candidate
+            metadata_int = metadata_int_candidate
         end
     end
 
-    return t_int, (; dim_int)
+    return t_int, metadata_int
 end
 
 function intersect(ray::Ray, triangle_vertices::Vector{Vector{Float64}})::Float64
