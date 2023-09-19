@@ -3,7 +3,7 @@ abstract type TriangleShape <: Shape end
 
 """
 Get default values for the metadata of the intersection of
-a certain shape when there is no intersection.
+a certain shape for when there is no intersection.
 """
 default_metadata(shape_type::Shape) = default_metadata(Val(typeof(shape_type)))
 
