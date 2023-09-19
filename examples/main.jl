@@ -17,7 +17,6 @@ function Sierpinski_pyramid_view()
     from = [-5.0, -5.0, 5.0]
     to = zeros(3)
     Rays.look_at!(camera, 1, from, to)
-    dropoff_curve(t) = clamp(7.0 - 0.9 * (t - 1), 0, 1.0)
 
     tetrahedron = Rays.Sierpinski_pyramid(zeros(3), 0.5, 4)
     collect_metadata = Dict(:face_int => Int)
@@ -37,7 +36,7 @@ function Sierpinski_pyramid_view()
         end
     end
 
-    canvas = Rays.cam_is_source(t_int, dropoff_curve; color)
+    canvas = Rays.cam_is_source(t_int; color)
     canvas = permutedims(canvas, [1, 3, 2])
     reverse!(canvas)
     colorview(RGB, canvas)
@@ -94,7 +93,7 @@ function simple_view()
         end
     end
 
-    canvas = Rays.cam_is_source(t_int, dropoff_curve; color)
+    canvas = Rays.cam_is_source(t_int; dropoff_curve, color)
     canvas = Rays.add_depth_of_field(canvas, t_int, focus_curve)
     canvas = permutedims(canvas, [1, 3, 2])
     reverse!(canvas)
@@ -173,7 +172,7 @@ function rotation_animation()
                 end
             end
 
-            canvas = Rays.cam_is_source(t_int, dropoff_curve; color)
+            canvas = Rays.cam_is_source(t_int; dropoff_curve, color)
             canvas = permutedims(canvas, [1, 3, 2])
             reverse!(canvas)
             canvas = RGB{N0f8}.([canvas[channel, :, :] for channel = 1:3]...)
