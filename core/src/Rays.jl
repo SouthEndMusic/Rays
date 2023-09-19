@@ -1,6 +1,7 @@
 module Rays
 
 using LinearAlgebra: cross, normalize, normalize!, norm, dot, transpose!
+using Combinatorics: combinations
 using Images
 using VideoIO
 using ProgressMeter

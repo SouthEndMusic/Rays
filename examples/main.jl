@@ -3,6 +3,45 @@ using Images
 using ProgressMeter
 using VideoIO
 
+function Sierpinski_pyramid_view()
+    julia_blue = [0.251, 0.388, 0.847]
+    julia_green = [0.22, 0.596, 0.149]
+    julia_purple = [0.584, 0.345, 0.698]
+    julia_red = [0.796, 0.235, 0.2]
+
+    julia_colors = [julia_blue, julia_green, julia_purple, julia_red]
+
+    camera = Rays.Camera(1)
+    camera.screen_res[1] = [1000, 1000]
+    camera.screen_dist[1] = [1.0]
+    from = [-5.0, -5.0, 5.0]
+    to = zeros(3)
+    Rays.look_at!(camera, 1, from, to)
+
+    tetrahedron = Rays.Sierpinski_pyramid(zeros(3), 0.5, 4)
+    collect_metadata = Dict(:face_int => Int)
+    t_int, metadata = Rays.shape_view(camera, 1, tetrahedron; collect_metadata)
+
+    screen_res = camera.screen_res[1]
+    color = zeros(3, screen_res...)
+    face_int = metadata[:face_int]
+    for i = 1:screen_res[1]
+        for j = 1:screen_res[2]
+            face_int_ = face_int[i, j]
+            color[:, i, j] = if iszero(face_int_)
+                zeros(3)
+            else
+                julia_colors[face_int_]
+            end
+        end
+    end
+
+    canvas = Rays.cam_is_source(t_int; color)
+    canvas = permutedims(canvas, [1, 3, 2])
+    reverse!(canvas)
+    colorview(RGB, canvas)
+end
+
 # Simple cube and sphere view
 function simple_view()
     julia_green = [0.22, 0.596, 0.149]
@@ -54,7 +93,7 @@ function simple_view()
         end
     end
 
-    canvas = Rays.cam_is_source(t_int, dropoff_curve; color)
+    canvas = Rays.cam_is_source(t_int; dropoff_curve, color)
     canvas = Rays.add_depth_of_field(canvas, t_int, focus_curve)
     canvas = permutedims(canvas, [1, 3, 2])
     reverse!(canvas)
@@ -133,7 +172,7 @@ function rotation_animation()
                 end
             end
 
-            canvas = Rays.cam_is_source(t_int, dropoff_curve; color)
+            canvas = Rays.cam_is_source(t_int; dropoff_curve, color)
             canvas = permutedims(canvas, [1, 3, 2])
             reverse!(canvas)
             canvas = RGB{N0f8}.([canvas[channel, :, :] for channel = 1:3]...)

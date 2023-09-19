@@ -45,20 +45,30 @@ If a color Array{Float64,3} is provided, this is multiplied by the grayscale can
 produce a colored image with varying brightness.
 """
 function cam_is_source(
-    intersections::Matrix{Float64},
-    dropoff_curve;
+    t_int::Matrix{Float64};
+    dropoff_curve::Union{Function,Nothing} = nothing,
     color::Union{Array{Float64,3},Nothing} = nothing,
 )::Array{Float64}
 
-    where_intersect = .!isinf.(intersections)
-    t_intersect = intersections[where_intersect]
+    if isnothing(dropoff_curve)
+        Max = maximum(x -> isinf(x) ? -Inf : x, t_int)
+        Min = minimum(t_int)
+        Diff = Max - Min
+        curve(x) = 1 - (x - Min) / Diff
+    else
+        curve = dropoff_curve
+    end
 
-    canvas = zeros(Float64, size(intersections)...)
-    canvas[where_intersect] = @. dropoff_curve(t_intersect)
+
+    where_intersect = .!isinf.(t_int)
+    t_int_noninf = t_int[where_intersect]
+
+    canvas = zeros(Float64, size(t_int)...)
+    canvas[where_intersect] = @. curve(t_int_noninf)
 
     # TODO: Move this to separate function for coloring
     if !isnothing(color)
-        canvas_color = zeros(Float64, 3, size(intersections)...)
+        canvas_color = zeros(Float64, 3, size(t_int)...)
 
         for channel = 1:3
             @. canvas_color[channel, :, :] = canvas * color[channel, :, :]
@@ -128,7 +138,7 @@ function add_depth_of_field(
                         continue
                     end
                     @. canvas_new[:, i_abs, j_abs] +=
-                        canvas[:, i, j] * kernel[i_max+i_+1] * kernel[i_max+j_+1]
+                        canvas[:, i, j] * kernel[Δi_max+Δi+1] * kernel[Δi_max+Δj+1]
                 end
             end
         end
