@@ -1,5 +1,10 @@
 abstract type Shape end
 abstract type TriangleShape <: Shape end
+
+"""
+Get default values for the metadata of the intersection of
+a certain shape when there is no intersection.
+"""
 default_metadata(shape_type::Shape) = default_metadata(Val(typeof(shape_type)))
 
 struct Sphere <: Shape
@@ -18,6 +23,14 @@ end
 
 default_metadata(::Val{Cube}) = (; dim_int = 0)
 
+"""
+A shape where each subshape is substituted by a shrinked
+version of the whole, up to a certain recursion depth.
+center: the center of the shape
+depth: the maximal recursion depth
+shrink_factor: the factor by which all lengths decrease for a substitution
+subshapes: the set of shapes that a shape is substituted with for a recursion step
+"""
 struct FractalShape{T<:Shape} <: Shape
     center::Vector{Float64}
     depth::Int
@@ -26,8 +39,8 @@ struct FractalShape{T<:Shape} <: Shape
 end
 
 """
-Create a Menger sponge of given location, size and recursion depth
-with the 'cubes' array automatically generated.
+Create a Menger sponge of given location, size and recursion depth,
+with the subshapes array automatically generated.
 """
 function Menger_sponge(center::Vector{Float64}, R::Float64, depth::Int)::FractalShape
     subcubes = Cube[]
@@ -52,6 +65,16 @@ function Menger_sponge(center::Vector{Float64}, R::Float64, depth::Int)::Fractal
     return FractalShape(center, depth, 3.0, subcubes)
 end
 
+"""
+A shape consisting of triangles.
+No assumptions are made about the structure of this shape.
+vertices: A n_vertices x 3 matrix of vertices
+faces: A n_faces x 3 matrix of faces. Each face is defined 
+    by the indices of 3 vertices.
+center: The center of the shape
+n_vertices: The number of vertices
+n_faces: the number of faces
+"""
 struct GeneralTriangleShape <: TriangleShape
     vertices::Matrix{Float64} # (n_vertices, 3)
     faces::Matrix{Int} # (n_faces, 3)
@@ -62,6 +85,10 @@ end
 
 default_metadata(::Val{GeneralTriangleShape}) = (; face_int = 0)
 
+"""
+See GeneralTriangleShape. 
+This struct assumes that the triangles enclose a convex volume.
+"""
 struct ConvexTriangleShape <: TriangleShape
     vertices::Matrix{Float64} # (n_vertices, 3)
     faces::Matrix{Int} # (n_faces, 3)
@@ -90,6 +117,10 @@ function Tetrahedron(center::Vector{Float64}, R::Float64)::ConvexTriangleShape
     return ConvexTriangleShape(vertices, faces, center, 4, 4)
 end
 
+"""
+Create a Sierpinski pyramid of given location, size and recursion depth,
+with the subshapes array automatically generated.
+"""
 function Sierpinski_pyramid(center::Vector{Float64}, R::Float64, depth::Int)::FractalShape
     subtetrahedra = ConvexTriangleShape[]
     R_subtetrahedron = R / 2
@@ -167,9 +198,9 @@ function intersect(ray::Ray, cube::Cube)::Tuple{Float64,NamedTuple}
 end
 
 """
-Compute the intersection of a ray with a Menger sponge.
-This is done recursively until the recursion depth of the Menger sponge.
-To compute the intersection of a ray with a sub-cube, the ray location is transformed.
+Compute the intersection of a ray with a fractal shape.
+This is done recursively until the recursion depth of the fractal shape.
+To compute the intersection of a ray with a subshape, the ray location is transformed.
 """
 function intersect(
     ray::Ray,
@@ -209,6 +240,11 @@ function intersect(
     return t_int, metadata_int
 end
 
+"""
+Compute the intersection of a ray with a triangle given by
+the triangle vertices. This constitutes a 3 variable
+linear system solve.
+"""
 function intersect(ray::Ray, triangle_vertices::Vector{Vector{Float64}})::Float64
     (; loc, dir) = ray
 
@@ -230,6 +266,10 @@ function intersect(ray::Ray, triangle_vertices::Vector{Vector{Float64}})::Float6
     end
 end
 
+"""
+Compute the intersection of a ray with a triangle shape
+as the smallest intersection time over all triangles.
+"""
 function intersect(ray::Ray, shape::TriangleShape)::Tuple{Float64,NamedTuple}
     (; vertices, faces) = shape
 
