@@ -52,9 +52,7 @@ function Menger_sponge(center::Vector{Float64}, R::Float64, depth::Int)::Fractal
         if 2 ∈ keys(m) && countmap(ordinals)[2] > 1
             continue
         end
-        center_subcube = zeros(3)
-        center_subcube += center
-        center_subcube += @. (ordinals - 2) * 2 * R_subcube
+        center_subcube = @. center + (ordinals - 2) * 2 * R_subcube
 
         subcube = Cube(center_subcube, R_subcube)
         push!(subcubes, subcube)
