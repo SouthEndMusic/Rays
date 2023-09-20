@@ -33,7 +33,11 @@ jobs:
                 version: ${{ matrix.julia_version }}
                 arch: ${{ matrix.arch }}
             - uses: julia-actions/julia-buildpkg@v1
+              with:
+                project: core
             - uses: julia-actions/julia-runtest@v1
+              with:
+                project: core
 
     
 
