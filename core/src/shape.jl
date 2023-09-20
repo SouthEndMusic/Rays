@@ -46,21 +46,16 @@ function Menger_sponge(center::Vector{Float64}, R::Float64, depth::Int)::Fractal
     subcubes = Cube[]
     R_subcube = R / 3
 
-    for i = 1:3
-        for j = 1:3
-            for k = 1:3
-                m = countmap([i, j, k])
-                if 2 ∈ keys(m) && countmap([i, j, k])[2] > 1
-                    continue
-                end
-                center_subcube = zeros(3)
-                center_subcube += center
-                center_subcube += @. ([i, j, k] - 2) * 2 * R_subcube
-
-                subcube = Cube(center_subcube, R_subcube)
-                push!(subcubes, subcube)
-            end
+    for ordinals in product(1:3, 1:3, 1:3)
+        ordinals = collect(ordinals)
+        m = countmap(ordinals)
+        if 2 ∈ keys(m) && countmap(ordinals)[2] > 1
+            continue
         end
+        center_subcube = @. center + (ordinals - 2) * 2 * R_subcube
+
+        subcube = Cube(center_subcube, R_subcube)
+        push!(subcubes, subcube)
     end
     return FractalShape(center, depth, 3.0, subcubes)
 end
