@@ -4,3 +4,6 @@
 
 # Manifest
 /core/Manifest.toml
+
+# Jupyter Notebook
+.ipynb_checkpoints
