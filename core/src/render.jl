@@ -146,3 +146,23 @@ function add_depth_of_field(
 
     return canvas_new
 end
+
+"""
+Apply a colormapping metadata -> colormapping to the color array.
+color_palette: (3, n_colors) array
+metadata: a metadata value of n yields the nth color in color color_palette
+a metadata value of 0 yields no change in color
+"""
+function add_color!(color::Array{Float64,3}, color_palette::Matrix{Float64}, metadata::Matrix{Int})::Nothing
+    screen_res = size(color)[2:3]
+
+    for i = 1:screen_res[1]
+        for j = 1:screen_res[2]
+            metadata_value = metadata[i, j]
+            if !iszero(metadata_value)
+                color[:, i, j] = color_palette[:, metadata_value]
+            end
+        end
+    end
+    return nothing
+end
