@@ -20,7 +20,9 @@ function shape_view(
         if haskey(metadata_default, metadata_var)
             push!(metadata_types, typeof(getfield(metadata_default, metadata_var)))
         else
-            error("Intersections with shapes of type $(typeof(shape)) have no metadata $metadata_var.")
+            error(
+                "Intersections with shapes of type $(typeof(shape)) have no metadata $metadata_var.",
+            )
         end
     end
 
@@ -36,7 +38,8 @@ function shape_view(
             t_int[i, j] = t_int_
 
             for metadata_var in metadata_variables
-                getfield(metadata, metadata_var)[i, j] = getfield(int_metadata, metadata_var)
+                getfield(metadata, metadata_var)[i, j] =
+                    getfield(int_metadata, metadata_var)
             end
         end
     end
@@ -160,7 +163,11 @@ color_palette: (3, n_colors) array
 metadata: a metadata value of n yields the nth color in color color_palette
 a metadata value of 0 yields no change in color
 """
-function add_color!(color::Array{Float64,3}, color_palette::Matrix{Float64}, metadata::Matrix{Int})::Nothing
+function add_color!(
+    color::Array{Float64,3},
+    color_palette::Matrix{Float64},
+    metadata::Matrix{Int},
+)::Nothing
     screen_res = size(color)[2:3]
 
     for i = 1:screen_res[1]

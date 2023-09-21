@@ -84,9 +84,9 @@ Get a Matrix{Float64} with the resolution of the provided camera.
 """
 function get_canvas(camera::Camera, cam_index::Int; color::Bool = false)::Array{Float64}
     return if color
-       zeros(Float64, 3, camera.screen_res[cam_index]...)
+        zeros(Float64, 3, camera.screen_res[cam_index]...)
     else
-       zeros(Float64, camera.screen_res[cam_index]...)
+        zeros(Float64, camera.screen_res[cam_index]...)
     end
 end
 
