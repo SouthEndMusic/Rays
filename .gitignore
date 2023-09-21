@@ -7,3 +7,6 @@
 
 # Jupyter Notebook
 .ipynb_checkpoints
+
+# Experiments folder
+experiments
