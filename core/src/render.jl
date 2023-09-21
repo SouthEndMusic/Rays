@@ -8,16 +8,24 @@ function shape_view(
     camera::Camera,
     cam_index::Int,
     shape::Shape;
-    collect_metadata::Dict{Symbol,DataType} = Dict{Symbol,DataType}(),
-)::Tuple{Matrix{Float64},Dict{Symbol,Matrix}}
+    metadata_variables::Vector{Symbol} = Symbol[],
+)::Tuple{Matrix{Float64},NamedTuple}
 
     (; screen_res) = camera
     screen_res = screen_res[cam_index]
 
-    metadata = Dict{Symbol,Matrix}()
-    for (s, T) in collect_metadata
-        metadata[s] = zeros(T, screen_res...)
+    metadata_default = default_metadata(shape)
+    metadata_types = DataType[]
+    for metadata_var in metadata_variables
+        if haskey(metadata_default, metadata_var)
+            push!(metadata_types, typeof(getfield(metadata_default, metadata_var)))
+        else
+            error("Intersections with shapes of type $(typeof(shape)) have no metadata $metadata_var.")
+        end
     end
+
+    metadata_matrices = [zeros(T, screen_res...) for T in metadata_types]
+    metadata = NamedTuple{Tuple(metadata_variables)}(Tuple(metadata_matrices))
 
     t_int = get_canvas(camera, cam_index)
 
@@ -27,9 +35,8 @@ function shape_view(
             t_int_, int_metadata = intersect(ray, shape)
             t_int[i, j] = t_int_
 
-            for s in keys(collect_metadata)
-                # TODO: Create a custom error for when the required metadata does not exist
-                metadata[s][i, j] = getfield(int_metadata, s)
+            for metadata_var in metadata_variables
+                getfield(metadata, metadata_var)[i, j] = getfield(int_metadata, metadata_var)
             end
         end
     end
