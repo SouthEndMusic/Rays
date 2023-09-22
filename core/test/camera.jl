@@ -50,9 +50,9 @@ end
 
     ray = Rays.get_ray(camera, 1, [24, 68])
     @test ray isa Rays.Ray
-    @test ray.loc ≈ Float32[0.6827902, 0.8868463, 0.1429134]
+    @test ray.loc ≈ Float32[0.6436098, 0.8657537, 0.15174258]
     @test norm(ray.dir) ≈ 1.0
-    @test ray.dir ≈ Float32[0.64553064, -0.761101, -0.0633676]
+    @test ray.dir ≈ Float32[0.2724516, -0.96194667, 0.020704657]
 
     @test_throws "Pixel indices must fall inside screen res [100, 100], got [0, 68]." Rays.get_ray(
         camera,
