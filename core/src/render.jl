@@ -58,7 +58,7 @@ function cam_is_source(
     t_int::Matrix{Float64};
     dropoff_curve::Union{Function,Nothing} = nothing,
     color::Union{Array{Float64,3},Nothing} = nothing,
-)::Array{Float64}
+)::Matrix{Float64}
 
     if isnothing(dropoff_curve)
         Max = maximum(x -> isinf(x) ? -Inf : x, t_int)
@@ -73,21 +73,10 @@ function cam_is_source(
     where_intersect = .!isinf.(t_int)
     t_int_noninf = t_int[where_intersect]
 
-    canvas = zeros(Float64, size(t_int)...)
-    canvas[where_intersect] = @. curve(t_int_noninf)
+    canvas_grayscale = zeros(Float64, size(t_int)...)
+    canvas_grayscale[where_intersect] = @. curve(t_int_noninf)
 
-    # TODO: Move this to separate function for coloring
-    if !isnothing(color)
-        canvas_color = zeros(Float64, 3, size(t_int)...)
-
-        for channel = 1:3
-            @. canvas_color[channel, :, :] = canvas * color[channel, :, :]
-        end
-
-        canvas = canvas_color
-    end
-
-    return canvas
+    return canvas_grayscale
 end
 
 """
@@ -179,4 +168,20 @@ function add_color!(
         end
     end
     return nothing
+end
+
+"""
+Multiply a graycale canvas by a color array to get a color canvas.
+"""
+function apply_color(
+    canvas_grayscale::Matrix{Float64},
+    color::Array{Float64,3},
+)::Array{Float64,3}
+    canvas_color = zeros(Float64, 3, size(canvas_grayscale)...)
+
+    for channel = 1:3
+        @. canvas_color[channel, :, :] = canvas_grayscale * color[channel, :, :]
+    end
+
+    return canvas_color
 end
