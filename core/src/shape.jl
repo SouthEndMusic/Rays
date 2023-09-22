@@ -5,7 +5,7 @@ abstract type TriangleShape <: Shape end
 Get default values for the metadata of the intersection of
 a certain shape for when there is no intersection.
 """
-default_metadata(shape_type::Shape) = default_metadata(Val(typeof(shape_type)))
+default_metadata(shape::Shape) = default_metadata(Val(typeof(shape)))
 
 struct Sphere <: Shape
     center::Vector{Float64}
@@ -37,6 +37,8 @@ struct FractalShape{T<:Shape} <: Shape
     shrink_factor::Float64
     subshapes::Vector{T}
 end
+
+default_metadata(shape::FractalShape) = default_metadata(first(shape.subshapes))
 
 """
 Create a Menger sponge of given location, size and recursion depth,
