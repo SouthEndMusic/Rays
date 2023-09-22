@@ -169,13 +169,15 @@ function add_color!(
 end
 
 """
-Multiply a graycale canvas by a color array to get a color canvas.
+Multiply a grayscale canvas by a color array to get a color canvas.
 """
 function apply_color(
     canvas_grayscale::Matrix{Float64},
     color::Array{Float64,3},
 )::Array{Float64,3}
-    @assert size(canvas_grayscale) == size(color)[2:3]
+    res_canvas_grayscale = size(canvas_grayscale)
+    res_color = size(color)[2:3]
+    @assert res_canvas_grayscale == res_color "canvas_grayscale and color must have the same resolution, got $res_canvas_grayscale and $res_color respectively."
 
     canvas_color = zeros(Float64, 3, size(canvas_grayscale)...)
 
