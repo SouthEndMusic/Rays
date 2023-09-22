@@ -2,6 +2,7 @@ module Rays
 
 using Combinatorics: combinations
 using IterTools: product
+using KernelAbstractions
 using LinearAlgebra: cross, normalize, normalize!, norm, dot, transpose!
 using ProgressMeter
 using StatsBase: countmap

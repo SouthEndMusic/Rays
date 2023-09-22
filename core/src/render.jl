@@ -9,7 +9,7 @@ function shape_view(
     cam_index::Int,
     shape::Shape;
     metadata_variables::Vector{Symbol} = Symbol[],
-)::Tuple{Matrix{Float64},NamedTuple}
+)::Tuple{AbstractMatrix,NamedTuple}
 
     (; screen_res) = camera
     screen_res = screen_res[cam_index]
@@ -55,9 +55,9 @@ If a color Array{Float64,3} is provided, this is multiplied by the grayscale can
 produce a colored image with varying brightness.
 """
 function cam_is_source(
-    t_int::Matrix{Float64};
+    t_int::AbstractMatrix{<:AbstractFloat};
     dropoff_curve::Union{Function,Nothing} = nothing,
-)::Matrix{Float64}
+)::AbstractMatrix{<:AbstractFloat}
 
     if isnothing(dropoff_curve)
         Max = maximum(x -> isinf(x) ? -Inf : x, t_int)
@@ -83,7 +83,7 @@ The distribution is based on integrating over pixels [i-1/2,i+1/2] ∩ [-p,p]
 the continuous distribution 
 f(x) = 15/16 (x^2-1)^2, x ∈ [-p,p].
 """
-function get_blur_kernel(p::Float64)::Tuple{Vector{Float64},Int}
+function get_blur_kernel(p::AbstractFloat)::Tuple{AbstractVector{<:AbstractFloat},Int}
     Δi_max = Int(floor(p + 0.5))
     kernel = zeros(2 * Δi_max + 1)
 
@@ -112,10 +112,10 @@ The depth of field effect is created by applying a kernel to pixel to
 is given by the focus curve at the intersection time at that pixel.
 """
 function add_depth_of_field(
-    canvas::Array{Float64,3},
-    t_int::Array{Float64,2},
+    canvas::AbstractArray{<:AbstractFloat,3},
+    t_int::AbstractMatrix{<:AbstractFloat},
     focus_curve,
-)::Array{Float64,3}
+)::AbstractArray{AbstractFloat,3}
 
     _, h, w = size(canvas)
     canvas_new = zero(canvas)
@@ -151,9 +151,9 @@ metadata: a metadata value of n yields the nth color in color color_palette
 a metadata value of 0 yields no change in color
 """
 function add_color!(
-    color::Array{Float64,3},
-    color_palette::Matrix{Float64},
-    metadata::Matrix{Int},
+    color::AbstractArray{<:AbstractFloat,3},
+    color_palette::AbstractMatrix{<:AbstractFloat},
+    metadata::AbstractMatrix{Int},
 )::Nothing
     screen_res = size(color)[2:3]
 
@@ -172,9 +172,9 @@ end
 Multiply a grayscale canvas by a color array to get a color canvas.
 """
 function apply_color(
-    canvas_grayscale::Matrix{Float64},
-    color::Array{Float64,3},
-)::Array{Float64,3}
+    canvas_grayscale::AbstractMatrix{<:AbstractFloat},
+    color::AbstractArray{<:AbstractFloat,3},
+)::AbstractArray
     res_canvas_grayscale = size(canvas_grayscale)
     res_color = size(color)[2:3]
     @assert res_canvas_grayscale == res_color "canvas_grayscale and color must have the same resolution, got $res_canvas_grayscale and $res_color respectively."

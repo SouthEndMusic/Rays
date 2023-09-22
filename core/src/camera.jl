@@ -11,15 +11,28 @@ warp: A function which changes the origin of rays as they leave the camera
 
 dir, up and right are orthormal and completely fix the orientation of the camera.
 """
-struct Camera
-    loc::Vector{Vector{Float64}}
-    dir::Vector{Vector{Float64}}
-    up::Vector{Vector{Float64}}
-    right::Vector{Vector{Float64}}
-    screen_size::Vector{Vector{Float64}} # height, width
-    screen_dist::Vector{Vector{Float64}}
+struct Camera{V<:AbstractVector{<:AbstractFloat}}
+    loc::Vector{V}
+    dir::Vector{V}
+    up::Vector{V}
+    right::Vector{V}
+    screen_size::Vector{V} # height, width
+    screen_dist::Vector{V}
     screen_res::Vector{Vector{Int}} # height, width
     warp::Vector{Function}
+
+    function Camera(
+        loc::Vector{V},
+        dir,
+        up,
+        right,
+        screen_size,
+        screen_dist,
+        screen_res,
+        warp,
+    ) where {V}
+        return new{V}(loc, dir, up, right, screen_size, screen_dist, screen_res, warp)
+    end
 end
 
 """
@@ -39,10 +52,14 @@ end
 """
 Get a default camera instance
 """
-function Camera(len::Int)::Camera
-    default_values =
-        [zeros(3), [1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.1, 0.1], [0.1], [100, 100]]
-    return Camera([fill(default_value, len) for default_value in default_values]...)
+function Camera(len::Int; vector_type::Type{V} = Vector{Float32})::Camera where {V}
+    default_values_float =
+        vector_type[zeros(3), [1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.1, 0.1], [0.1]]
+    screen_res = [100, 100]
+
+    values = [fill(default_value, len) for default_value in default_values_float]
+
+    return Camera(values..., fill(screen_res, len))
 end
 
 
@@ -55,8 +72,8 @@ e.g. the camera points straight up or straight down.
 function look_at!(
     camera::Camera,
     cam_index::Int,
-    from::Vector{Float64},
-    to::Vector{Float64},
+    from::AbstractVector{<:AbstractFloat},
+    to::AbstractVector{<:AbstractFloat},
 )::Nothing
     (; loc, dir, up, right) = camera
 
@@ -82,11 +99,17 @@ end
 """
 Get an Array{Float64} with the resolution of the provided camera.
 """
-function get_canvas(camera::Camera, cam_index::Int; color::Bool = false)::Array{Float64}
+function get_canvas(
+    camera::Camera,
+    cam_index::Int;
+    color::Bool = false,
+)::AbstractArray
+    dtype = eltype(camera.loc[1])
+
     return if color
-        zeros(Float64, 3, camera.screen_res[cam_index]...)
+        zeros(dtype, 3, camera.screen_res[cam_index]...)
     else
-        zeros(Float64, camera.screen_res[cam_index]...)
+        zeros(dtype, camera.screen_res[cam_index]...)
     end
 end
 
@@ -94,9 +117,9 @@ end
 loc: The origin of the ray 
 dir: The direction of the ray (unit vector)
 """
-struct Ray
-    loc::Vector{Float64}
-    dir::Vector{Float64}
+struct Ray{V<:AbstractVector{<:AbstractFloat}}
+    loc::V
+    dir::V
 end
 
 """
