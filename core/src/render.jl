@@ -117,11 +117,11 @@ function add_depth_of_field(
     focus_curve,
 )::Array{Float64,3}
 
-    _, w, h = size(canvas)
+    _, h, w = size(canvas)
     canvas_new = zero(canvas)
 
-    for i = 1:w
-        for j = 1:h
+    for i = 1:h
+        for j = 1:w
             if isinf(t_int[i, j])
                 continue
             end
@@ -175,6 +175,8 @@ function apply_color(
     canvas_grayscale::Matrix{Float64},
     color::Array{Float64,3},
 )::Array{Float64,3}
+    @assert size(canvas_grayscale) == size(color)[2:3]
+
     canvas_color = zeros(Float64, 3, size(canvas_grayscale)...)
 
     for channel = 1:3

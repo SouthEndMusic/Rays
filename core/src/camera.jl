@@ -16,9 +16,9 @@ struct Camera
     dir::Vector{Vector{Float64}}
     up::Vector{Vector{Float64}}
     right::Vector{Vector{Float64}}
-    screen_size::Vector{Vector{Float64}} # x,y
+    screen_size::Vector{Vector{Float64}} # height, width
     screen_dist::Vector{Vector{Float64}}
-    screen_res::Vector{Vector{Int}} # x,y
+    screen_res::Vector{Vector{Int}} # height, width
     warp::Vector{Function}
 end
 
@@ -37,7 +37,7 @@ function Camera(loc, dir, up, screen_size, screen_dist, screen_res; warp = nothi
 end
 
 """
-Get a trivial camera instance
+Get a default camera instance
 """
 function Camera(len::Int)::Camera
     default_values =
@@ -121,12 +121,12 @@ function get_ray(camera::Camera, cam_index::Int, pixel_indices::Vector{Int})::Ra
     end
 
     i, j = pixel_indices
-    s_w, s_h = screen_size
-    res_w, res_h = screen_res
+    s_h, s_w = screen_size
+    res_h, res_w = screen_res
 
     ray_loc = loc + screen_dist * dir
-    ray_loc += ((j - 1) / (res_h - 1) - 0.5) * s_h * up
-    ray_loc += ((i - 1) / (res_w - 1) - 0.5) * s_w * right
+    ray_loc -= ((i - 1) / (res_h - 1) - 0.5) * s_h * up
+    ray_loc += ((j - 1) / (res_w - 1) - 0.5) * s_w * right
 
     ray_dir = ray_loc - loc
     normalize!(ray_dir)
