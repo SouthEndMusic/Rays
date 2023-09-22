@@ -57,7 +57,6 @@ produce a colored image with varying brightness.
 function cam_is_source(
     t_int::Matrix{Float64};
     dropoff_curve::Union{Function,Nothing} = nothing,
-    color::Union{Array{Float64,3},Nothing} = nothing,
 )::Matrix{Float64}
 
     if isnothing(dropoff_curve)
@@ -68,7 +67,6 @@ function cam_is_source(
     else
         curve = dropoff_curve
     end
-
 
     where_intersect = .!isinf.(t_int)
     t_int_noninf = t_int[where_intersect]

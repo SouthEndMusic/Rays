@@ -80,7 +80,7 @@ function look_at!(
 end
 
 """
-Get a Matrix{Float64} with the resolution of the provided camera.
+Get an Array{Float64} with the resolution of the provided camera.
 """
 function get_canvas(camera::Camera, cam_index::Int; color::Bool = false)::Array{Float64}
     return if color
