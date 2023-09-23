@@ -6,13 +6,11 @@ for instance the intersection dimension for cubes.
 """
 function shape_view(
     camera::Camera,
-    cam_index::Int,
     shape::Shape;
     metadata_variables::Vector{Symbol} = Symbol[],
 )::Tuple{AbstractMatrix,NamedTuple}
 
     (; screen_res) = camera
-    screen_res = screen_res[cam_index]
 
     metadata_default = default_metadata(shape)
     metadata_types = DataType[]
@@ -29,18 +27,15 @@ function shape_view(
     metadata_matrices = [zeros(T, screen_res...) for T in metadata_types]
     metadata = NamedTuple{Tuple(metadata_variables)}(Tuple(metadata_matrices))
 
-    t_int = get_canvas(camera, cam_index)
+    t_int = get_canvas(camera)
 
-    for i = 1:screen_res[1]
-        for j = 1:screen_res[2]
-            ray = get_ray(camera, cam_index, [i, j])
-            t_int_, int_metadata = intersect(ray, shape)
-            t_int[i, j] = t_int_
+    @threads for I in CartesianIndices(t_int)
+        ray = get_ray(camera, Tuple(I))
+        t_int_, int_metadata = intersect(ray, shape)
+        t_int[I] = t_int_
 
-            for metadata_var in metadata_variables
-                getfield(metadata, metadata_var)[i, j] =
-                    getfield(int_metadata, metadata_var)
-            end
+        for metadata_var in metadata_variables
+            getfield(metadata, metadata_var)[I] = getfield(int_metadata, metadata_var)
         end
     end
 
@@ -120,23 +115,22 @@ function add_depth_of_field(
     _, h, w = size(canvas)
     canvas_new = zero(canvas)
 
-    for i = 1:h
-        for j = 1:w
-            if isinf(t_int[i, j])
-                continue
-            end
-            focus = focus_curve(t_int[i, j])
-            kernel, Δi_max = get_blur_kernel(focus)
-            for Δi = -Δi_max:Δi_max
-                for Δj = -Δi_max:Δi_max
-                    i_abs = i + Δi
-                    j_abs = j + Δj
-                    if (i_abs < 1) || (i_abs > w) || (j_abs < 1) || (j_abs > h)
-                        continue
-                    end
-                    @. canvas_new[:, i_abs, j_abs] +=
-                        canvas[:, i, j] * kernel[Δi_max+Δi+1] * kernel[Δi_max+Δj+1]
+    @threads for I in CartesianIndices(t_int)
+        if isinf(t_int[I])
+            continue
+        end
+        focus = focus_curve(t_int[I])
+        kernel, Δi_max = get_blur_kernel(focus)
+        i, j = Tuple(I)
+        for Δi = -Δi_max:Δi_max
+            for Δj = -Δi_max:Δi_max
+                i_abs = i + Δi
+                j_abs = j + Δj
+                if (i_abs < 1) || (i_abs > w) || (j_abs < 1) || (j_abs > h)
+                    continue
                 end
+                @. canvas_new[:, i_abs, j_abs] +=
+                    canvas[:, i, j] * kernel[Δi_max+Δi+1] * kernel[Δi_max+Δj+1]
             end
         end
     end
@@ -155,14 +149,10 @@ function add_color!(
     color_palette::AbstractMatrix{<:AbstractFloat},
     metadata::AbstractMatrix{Int},
 )::Nothing
-    screen_res = size(color)[2:3]
-
-    for i = 1:screen_res[1]
-        for j = 1:screen_res[2]
-            metadata_value = metadata[i, j]
-            if !iszero(metadata_value)
-                color[:, i, j] = color_palette[:, metadata_value]
-            end
+    @threads for I in CartesianIndices(metadata)
+        metadata_value = metadata[I]
+        if !iszero(metadata_value)
+            color[:, I] = color_palette[:, metadata_value]
         end
     end
     return nothing
@@ -179,10 +169,10 @@ function apply_color(
     res_color = size(color)[2:3]
     @assert res_canvas_grayscale == res_color "canvas_grayscale and color must have the same resolution, got $res_canvas_grayscale and $res_color respectively."
 
-    canvas_color = zeros(Float64, 3, size(canvas_grayscale)...)
+    canvas_color = zeros(Float64, size(color)...)
 
-    for channel = 1:3
-        @. canvas_color[channel, :, :] = canvas_grayscale * color[channel, :, :]
+    @threads for I in CartesianIndices(canvas_grayscale)
+        @. canvas_color[:, I] = canvas_grayscale[I] * color[:, I]
     end
 
     return canvas_color

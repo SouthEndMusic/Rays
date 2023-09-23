@@ -11,40 +11,36 @@ warp: A function which changes the origin of rays as they leave the camera
 
 dir, up and right are orthormal and completely fix the orientation of the camera.
 """
-struct Camera{V<:AbstractVector{<:AbstractFloat}}
-    loc::Vector{V}
-    dir::Vector{V}
-    up::Vector{V}
-    right::Vector{V}
-    screen_size::Vector{V} # height, width
-    screen_dist::Vector{V}
-    screen_res::Vector{Vector{Int}} # height, width
-    warp::Vector{Function}
-
+struct Camera{F<:AbstractFloat,I<:Integer}
+    loc::Vector{F}
+    dir::Vector{F}
+    up::Vector{F}
+    right::Vector{F}
+    screen_size::Vector{F} # height, width
+    screen_dist::Vector{F}
+    screen_res::Vector{I} # height, width
+    warp::Function
     function Camera(
-        loc::Vector{V},
-        dir,
-        up,
-        right,
-        screen_size,
-        screen_dist,
-        screen_res,
+        loc::Vector{F},
+        dir::Vector{F},
+        up::Vector{F},
+        right::Vector{F},
+        screen_size::Vector{F},
+        screen_dist::Vector{F},
+        screen_res::Vector{I},
         warp,
-    ) where {V}
-        return new{V}(loc, dir, up, right, screen_size, screen_dist, screen_res, warp)
+    ) where {F,I}
+        return new{F,I}(loc, dir, up, right, screen_size, screen_dist, screen_res, warp)
     end
 end
 
 """
-Construct a camera object where the 'right' vectors are computed using the cross product
-and warp functions are optional.
+Construct a camera object where the 'right' vector is computed using the cross product.
 """
 function Camera(loc, dir, up, screen_size, screen_dist, screen_res; warp = nothing)::Camera
-    right = [cross(dir_, up_) for (dir_, up_) in zip(dir, up)]
+    right = cross(dir, up)
 
-    if isnothing(warp)
-        warp = fill(identity, length(loc))
-    end
+    warp = isnothing(warp) ? identity : warp
 
     return Camera(loc, dir, up, right, screen_size, screen_dist, screen_res, warp)
 end
@@ -52,14 +48,12 @@ end
 """
 Get a default camera instance
 """
-function Camera(len::Int; vector_type::Type{V} = Vector{Float32})::Camera where {V}
+function Camera(; float_type = Float32)::Camera{<:AbstractFloat,Int64}
     default_values_float =
-        vector_type[zeros(3), [1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.1, 0.1], [0.1]]
+        Vector{float_type}[zeros(3), [1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.1, 0.1], [0.1]]
     screen_res = [100, 100]
 
-    values = [fill(default_value, len) for default_value in default_values_float]
-
-    return Camera(values..., fill(screen_res, len))
+    return Camera(default_values_float..., screen_res; warp = identity)
 end
 
 
@@ -71,27 +65,25 @@ e.g. the camera points straight up or straight down.
 """
 function look_at!(
     camera::Camera,
-    cam_index::Int,
     from::AbstractVector{<:AbstractFloat},
     to::AbstractVector{<:AbstractFloat},
 )::Nothing
     (; loc, dir, up, right) = camera
 
-    loc[cam_index] = from
+    loc .= from
+    dir .= normalize(to - from)
 
-    dir_ = normalize(to - from)
-    dir_z = dir_[3]
+    dir_z = dir[3]
     denom = sqrt(1 - dir_z^2)
 
     if denom ≈ 0.0
         error("In 'look_at!', the camera cannot point straight up or down.")
     end
 
-    dir[cam_index] = dir_
-    up[cam_index] = -dir_z * dir_
-    up[cam_index][3] += 1
-    up[cam_index] /= denom
-    right[cam_index] = cross(dir_, up[cam_index])
+    up .= -dir_z * dir
+    up[3] += 1.0
+    up ./= denom
+    right .= cross(dir, up)
 
     return nothing
 end
@@ -100,16 +92,14 @@ end
 Get an Array{Float64} with the resolution of the provided camera.
 """
 function get_canvas(
-    camera::Camera,
-    cam_index::Int;
+    camera::Camera{F};
     color::Bool = false,
-)::AbstractArray
-    dtype = eltype(camera.loc[1])
+)::Array{F} where {F<:AbstractFloat}
 
     return if color
-        zeros(dtype, 3, camera.screen_res[cam_index]...)
+        zeros(F, 3, camera.screen_res...)
     else
-        zeros(dtype, camera.screen_res[cam_index]...)
+        zeros(F, camera.screen_res...)
     end
 end
 
@@ -117,27 +107,22 @@ end
 loc: The origin of the ray 
 dir: The direction of the ray (unit vector)
 """
-struct Ray{V<:AbstractVector{<:AbstractFloat}}
-    loc::V
-    dir::V
+struct Ray{F<:AbstractFloat}
+    loc::Vector{F}
+    dir::Vector{F}
 end
 
 """
 Compute the location and direction of a ray emited from the camera for 
 the given pixel indices.
-If a warp function is provided, this function is applied to the ray location.
 """
-function get_ray(camera::Camera, cam_index::Int, pixel_indices::Vector{Int})::Ray
-    (; loc, dir, up, right, screen_size, screen_dist, screen_res, warp) = camera
+function get_ray(
+    camera::Camera{F},
+    pixel_indices::Tuple{<:Integer,<:Integer},
+)::Ray{F} where {F<:AbstractFloat}
+    (; screen_dist, screen_size, screen_res, dir, loc, up, right, warp) = camera
 
-    loc = loc[cam_index]
-    dir = dir[cam_index]
-    up = up[cam_index]
-    right = right[cam_index]
-    screen_size = screen_size[cam_index]
-    screen_dist = screen_dist[cam_index][1]
-    screen_res = screen_res[cam_index]
-    warp! = warp[cam_index]
+    screen_dist = screen_dist[1]
 
     if !(all(pixel_indices .> 0) && all(pixel_indices .<= screen_res))
         error("Pixel indices must fall inside screen res $screen_res, got $pixel_indices.")
@@ -154,7 +139,7 @@ function get_ray(camera::Camera, cam_index::Int, pixel_indices::Vector{Int})::Ra
     ray_dir = ray_loc - loc
     normalize!(ray_dir)
 
-    warp!(ray_loc)
+    warp(ray_loc)
 
-    return Ray(ray_loc, ray_dir)
+    return Ray{F}(ray_loc, ray_dir)
 end

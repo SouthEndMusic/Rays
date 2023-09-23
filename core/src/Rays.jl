@@ -1,8 +1,8 @@
 module Rays
 
+using Base.Threads
 using Combinatorics: combinations
 using IterTools: product
-using KernelAbstractions
 using LinearAlgebra: cross, normalize, normalize!, norm, dot, transpose!
 using ProgressMeter
 using StatsBase: countmap
