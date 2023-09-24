@@ -7,39 +7,41 @@ for instance the intersection dimension for cubes.
 function shape_view(
     camera::Camera,
     shape::Shape;
-    metadata_variables::Vector{Symbol} = Symbol[],
-)::Tuple{AbstractMatrix,NamedTuple}
+    data_variables::Vector{Symbol} = Symbol[],
+)::NamedTuple
 
     (; screen_res) = camera
 
-    metadata_default = default_metadata(shape)
-    metadata_types = DataType[]
-    for metadata_var in metadata_variables
-        if haskey(metadata_default, metadata_var)
-            push!(metadata_types, typeof(getfield(metadata_default, metadata_var)))
+    intersection_default = default_intersection(shape)
+    intersection_type = typeof(intersection_default)
+    if !(:t in data_variables)
+        push!(data_variables, :t)
+    end
+
+    data_types = DataType[]
+    for data_var in data_variables
+        if hasfield(intersection_type, data_var)
+            push!(data_types, eltype(getfield(intersection_default, data_var)))
         else
             error(
-                "Intersections with shapes of type $(typeof(shape)) have no metadata $metadata_var.",
+                "Intersections with shapes of type $(typeof(shape)) have no metadata $data_var.",
             )
         end
     end
 
-    metadata_matrices = [zeros(T, screen_res...) for T in metadata_types]
-    metadata = NamedTuple{Tuple(metadata_variables)}(Tuple(metadata_matrices))
+    data_matrices = [zeros(T, screen_res...) for T in data_types]
+    data = NamedTuple{Tuple(data_variables)}(Tuple(data_matrices))
 
-    t_int = get_canvas(camera)
-
-    @threads for I in CartesianIndices(t_int)
+    @threads for I in CartesianIndices(data.t)
         ray = get_ray(camera, Tuple(I))
-        t_int_, int_metadata = intersect(ray, shape)
-        t_int[I] = t_int_
+        intersection = intersect(ray, shape)
 
-        for metadata_var in metadata_variables
-            getfield(metadata, metadata_var)[I] = getfield(int_metadata, metadata_var)
+        for data_var in data_variables
+            getfield(data, data_var)[I] = getfield(intersection, data_var)[1]
         end
     end
 
-    return t_int, metadata
+    return data
 end
 
 """
