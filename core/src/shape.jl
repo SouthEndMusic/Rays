@@ -151,7 +151,8 @@ real solution to a quadratic polynomial, if it exists.
 """
 function intersect(
     ray::Ray{F},
-    sphere::Sphere,
+    sphere::Sphere;
+    intersection::Union{Intersection_plain{F}, Nothing} = nothing,
 )::Intersection_plain{F} where {F<:AbstractFloat}
     (; loc, dir) = ray
     (; center, Rsq) = sphere
@@ -162,13 +163,15 @@ function intersect(
     c = norm(diff)^2 - Rsq
     discr = b^2 - 4 * a * c
 
-    t_int = if discr >= 0
+    if discr >= 0
         t_int = (-b - sqrt(discr)) / (2 * a)
+        intersection = Intersection_plain{F}([t_int])
     else
-        Inf
+        if isnothing(intersection)
+            intersection = default_intersection(sphere)
+        end
     end
-
-    return Intersection_plain{F}([t_int])
+     return intersection
 end
 
 """
@@ -177,39 +180,40 @@ with each of the 6 face planes and then checking whether the intersection is wit
 """
 function intersect(
     ray::Ray{F},
-    cube::Cube{F},
+    cube::Cube{F};
+    intersection::Union{Intersection_with_dim{F,<:Integer}, Nothing} = nothing,
 )::Intersection_with_dim{F,<:Integer} where {F<:AbstractFloat}
-    (; loc, dir) = ray
-    (; center, R) = cube
 
-    intersection = default_intersection(cube)
+    if isnothing(intersection)
+        intersection = default_intersection(cube)
+    end
 
     for dim = 1:3
-        bound_small = center[dim] - R
-        diff_bound_small = bound_small - loc[dim]
-        dir_dim_positive = (dir[dim] > 0) # dir_dim = 0 not taken into account
+        bound_small = cube.center[dim] - cube.R
+       diff_bound_small = bound_small - ray.loc[dim]
+        dir_dim_positive = (ray.dir[dim] > 0) # dir_dim = 0 not taken into account
 
         if diff_bound_small > 0.0
             if dir_dim_positive
-                t_int_candidate = diff_bound_small / dir[dim]
+                t_int_candidate = diff_bound_small / ray.dir[dim]
             else
                 return intersection
             end
         else
-            bound_big = center[dim] + R
-            diff_bound_big = bound_big - loc[dim]
+            bound_big = cube.center[dim] + cube.R
+            diff_bound_big = bound_big - ray.loc[dim]
 
             if diff_bound_big > 0.0
                 if dir_dim_positive
-                    t_int_candidate = diff_bound_big / dir[dim]
+                    t_int_candidate = diff_bound_big / ray.dir[dim]
                 else
-                    t_int_candidate = -diff_bound_small / dir[dim]
+                    t_int_candidate = -diff_bound_small / ray.dir[dim]
                 end
             else
                 if dir_dim_positive
                     return intersection
                 else
-                    t_int_candidate = diff_bound_big / dir[dim]
+                    t_int_candidate = diff_bound_big / ray.dir[dim]
                 end
             end
         end
@@ -222,11 +226,11 @@ function intersect(
                 other_dim += 1
 
                 if other_dim !== dim
-                    loc_int_other_dim_1 = loc[other_dim] + t_int_candidate * dir[other_dim]
-                    if loc_int_other_dim_1 > center[other_dim] + R
+                    loc_int_other_dim_1 = ray.loc[other_dim] + t_int_candidate * ray.dir[other_dim]
+                    if loc_int_other_dim_1 > cube.center[other_dim] + cube.R
                         candidate = false
                         continue
-                    elseif loc_int_other_dim_1 < center[other_dim] - R
+                    elseif loc_int_other_dim_1 < cube.center[other_dim] - cube.R
                         candidate = false
                         continue
                     end
@@ -249,15 +253,19 @@ To compute the intersection of a ray with a subshape, the ray location is transf
 function intersect(
     ray::Ray{F},
     fractal_shape::FractalShape{F};
+    intersection::Union{Intersection, Nothing} = nothing,
     current_depth::Int = 0,
 )::Intersection where {F<:AbstractFloat}
     (; subshapes, depth, shrink_factor) = fractal_shape
 
-    intersection = default_intersection(first(subshapes))
+    if isnothing(intersection)
+        intersection = default_intersection(first(subshapes))
+    end
+
     subshape_intersect = nothing
 
     for subshape in subshapes
-        intersection_candidate = intersect(ray, subshape)
+        intersection_candidate = intersect(ray, subshape; intersection)
 
         if intersection_candidate.t[1] < intersection.t[1]
             subshape_intersect = subshape
@@ -271,7 +279,7 @@ function intersect(
             shrink_factor * (ray.loc + fractal_shape.center - subshape_intersect.center)
         ray_transformed = Ray(loc_transformed, ray.dir)
         intersection_candidate =
-            intersect(ray_transformed, fractal_shape; current_depth = current_depth + 1)
+            intersect(ray_transformed, fractal_shape; intersection, current_depth = current_depth + 1)
         intersection_candidate.t[1] /= shrink_factor
 
         if intersection_candidate.t < intersection.t
@@ -317,11 +325,14 @@ as the smallest intersection time over all triangles.
 """
 function intersect(
     ray::Ray{F},
-    shape::TriangleShape{F},
+    shape::TriangleShape{F};
+    intersection::Union{Intersection_with_face{F,<:Integer},Nothing} = nothing,
 )::Intersection_with_face{F,<:Integer} where {F<:AbstractFloat}
     (; vertices, faces) = shape
 
-    intersection = default_intersection(shape)
+    if isnothing(intersection)
+        intersection = default_intersection(shape)
+    end
 
     for i = 1:shape.n_faces
         triangle_vertices = [vertices[j, :] for j in faces[i, :]]

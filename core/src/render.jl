@@ -34,7 +34,7 @@ function shape_view(
 
     @threads for I in CartesianIndices(data.t)
         ray = get_ray(camera, Tuple(I))
-        intersection = intersect(ray, shape)
+        intersection = intersect(ray, shape; intersection = intersection_default)
 
         for data_var in data_variables
             getfield(data, data_var)[I] = getfield(intersection, data_var)[1]
