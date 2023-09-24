@@ -1,7 +1,6 @@
 using Test
 using Rays
 using LinearAlgebra: normalize!
-
 @testset "Sphere" begin
     center = ones(3)
     R = 0.5
@@ -12,12 +11,12 @@ using LinearAlgebra: normalize!
     dir = ones(3)
     normalize!(dir)
     ray = Rays.Ray(loc, dir)
-    t_int, _ = Rays.intersect(ray, sphere)
-    @test t_int ≈ sqrt(3) - 0.5
+    intersection = Rays.intersect(ray, sphere)
+    @test intersection.t[1] ≈ sqrt(3) - 0.5
 
     ray.dir[:] = [0.0, 0.0, 1.0]
-    t_int, _ = Rays.intersect(ray, sphere)
-    @test t_int == Inf
+    intersection = Rays.intersect(ray, sphere)
+    @test intersection.t[1] == Inf
 end
 
 @testset "Cube" begin
@@ -31,8 +30,7 @@ end
     normalize!(dir)
     ray = Rays.Ray(loc, dir)
 
-    t_int, int_metadata = Rays.intersect(ray, cube)
-    @test t_int ≈ 1.5
-    @test haskey(int_metadata, :dim_int)
-    @test int_metadata.dim_int == 2
+    intersection = Rays.intersect(ray, cube)
+    @test intersection.t[1] ≈ 1.5
+    @test intersection.dim[1] == 2
 end
