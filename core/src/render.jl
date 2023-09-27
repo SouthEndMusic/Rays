@@ -12,7 +12,7 @@ function shape_view(
 
     (; screen_res) = camera
 
-    intersection_default = default_intersection(shape)
+    intersection_default = get_default_intersection(shape)
     intersection_type = typeof(intersection_default)
     if !(:t in data_variables)
         push!(data_variables, :t)
@@ -32,13 +32,17 @@ function shape_view(
     data_matrices = [zeros(T, screen_res...) for T in data_types]
     data = NamedTuple{Tuple(data_variables)}(Tuple(data_matrices))
 
-    @threads for I in CartesianIndices(data.t)
-        ray = get_ray(camera, Tuple(I))
-        intersection = intersect(ray, shape)
+    intersections = [get_default_intersection(shape) for i in 1:nthreads()]
 
+    @threads for I in CartesianIndices(data.t)
+        intersection = intersections[threadid()]
+        ray = get_ray(camera, Tuple(I))
+        intersect!(ray, shape; intersection)
+        
         for data_var in data_variables
             getfield(data, data_var)[I] = getfield(intersection, data_var)[1]
         end
+        set_default_intersection!(intersection)
     end
 
     return data
