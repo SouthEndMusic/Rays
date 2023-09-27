@@ -42,7 +42,7 @@ function Menger_sponge(
     center::Vector{F},
     R::AbstractFloat,
     depth::Int,
-)::FractalShape{F,I,Cube{F}} where {F}
+)::FractalShape{F,Cube{F}} where {F}
     subcubes = Cube{F}[]
     R_subcube = R / 3
     R_subcube = convert(F, R_subcube)
@@ -59,7 +59,7 @@ function Menger_sponge(
         subcube = Cube(center_subcube, R_subcube)
         push!(subcubes, subcube)
     end
-    return FractalShape{F,I,Cube{F}}(center, depth, 3.0, subcubes)
+    return FractalShape{F,Cube{F}}(center, depth, 3.0, subcubes)
 end
 
 """
@@ -85,7 +85,7 @@ end
 """
 Construct a triangle shape where the normals are computed automatically from the vertices.
 """
-function TriangleShape(vertices::Matrix{F}, faces::Matrix{Int}, center::Vector{F}; convex::Bool = false)::TriangleShape{F,I} where {F}
+function TriangleShape(vertices::Matrix{F}, faces::Matrix{Int}, center::Vector{F}; convex::Bool = false)::TriangleShape{F} where {F}
     n_vertices = size(vertices)[1]
     n_faces = size(faces)[1]
     normals = zeros(F, n_faces, 3)
@@ -130,7 +130,7 @@ function Sierpinski_pyramid(
     center::Vector{F},
     R::AbstractFloat,
     depth::Int,
-)::FractalShape{F,I,TriangleShape{F}} where {F}
+)::FractalShape{F,TriangleShape{F}} where {F}
     subtetrahedra = TriangleShape{F}[]
     R_subtetrahedron = convert(F, R / 2)
 

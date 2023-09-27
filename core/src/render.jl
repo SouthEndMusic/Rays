@@ -15,11 +15,11 @@ function shape_view(
         push!(data_variables, :t)
     end
 
-    intersection::Intersection{F} = Intersection()
+    intersection_example::Intersection{F} = Intersection()
     data_types = DataType[]
     for data_var in data_variables
         if hasfield(Intersection, data_var)
-            push!(data_types, eltype(getfield(intersection, data_var)))
+            push!(data_types, eltype(getfield(intersection_example, data_var)))
         else
             error(
                 "Intersections cannot have no metadata $data_var.",
