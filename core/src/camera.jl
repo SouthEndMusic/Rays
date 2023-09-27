@@ -11,14 +11,14 @@ warp: A function which changes the origin of rays as they leave the camera
 
 dir, up and right are orthormal and completely fix the orientation of the camera.
 """
-struct Camera{F<:AbstractFloat,I<:Integer}
+struct Camera{F<:AbstractFloat}
     loc::Vector{F}
     dir::Vector{F}
     up::Vector{F}
     right::Vector{F}
     screen_size::Vector{F} # height, width
     screen_dist::Vector{F}
-    screen_res::Vector{I} # height, width
+    screen_res::Vector{Int} # height, width
     warp::Function
     function Camera(
         loc::Vector{F},
@@ -27,10 +27,10 @@ struct Camera{F<:AbstractFloat,I<:Integer}
         right::Vector{F},
         screen_size::Vector{F},
         screen_dist::Vector{F},
-        screen_res::Vector{I},
+        screen_res,
         warp,
-    ) where {F,I}
-        return new{F,I}(loc, dir, up, right, screen_size, screen_dist, screen_res, warp)
+    ) where {F}
+        return new{F}(loc, dir, up, right, screen_size, screen_dist, screen_res, warp)
     end
 end
 
@@ -48,7 +48,7 @@ end
 """
 Get a default camera instance
 """
-function Camera(; float_type = Float32)::Camera{<:AbstractFloat,Int64}
+function Camera(; float_type = Float32)::Camera{<:AbstractFloat}
     default_values_float =
         Vector{float_type}[zeros(3), [1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.1, 0.1], [0.1]]
     screen_res = [100, 100]
@@ -64,10 +64,10 @@ e_z = [0,0,1] and di,r and orthogonal to dir. This does not work if dir and e_z 
 e.g. the camera points straight up or straight down.
 """
 function look_at!(
-    camera::Camera,
-    from::AbstractVector{<:AbstractFloat},
-    to::AbstractVector{<:AbstractFloat},
-)::Nothing
+    camera::Camera{F},
+    from::AbstractVector{F},
+    to::AbstractVector{F},
+)::Nothing where {F}
     (; loc, dir, up, right) = camera
 
     loc .= from
@@ -94,7 +94,7 @@ Get an Array{Float64} with the resolution of the provided camera.
 function get_canvas(
     camera::Camera{F};
     color::Bool = false,
-)::Array{F} where {F<:AbstractFloat}
+)::Array{F} where {F}
 
     return if color
         zeros(F, 3, camera.screen_res...)
@@ -118,8 +118,8 @@ the given pixel indices.
 """
 function get_ray(
     camera::Camera{F},
-    pixel_indices::Tuple{<:Integer,<:Integer},
-)::Ray{F} where {F<:AbstractFloat}
+    pixel_indices::Tuple{Int,Int},
+)::Ray{F} where {F}
     (; screen_dist, screen_size, screen_res, dir, loc, up, right, warp) = camera
 
     screen_dist = screen_dist[1]

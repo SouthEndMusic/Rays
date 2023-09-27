@@ -18,8 +18,8 @@ end
 
 @testset "look at" begin
     camera = Rays.Camera()
-    from = [0.2947051, 0.45194465, 0.05835851]
-    to = [0.21519046, 0.39008522, 0.3857729]
+    from = Float32[0.2947051, 0.45194465, 0.05835851]
+    to = Float32[0.21519046, 0.39008522, 0.3857729]
     Rays.look_at!(camera, from, to)
 
     @test camera.loc ≈ from
