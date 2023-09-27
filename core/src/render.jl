@@ -18,7 +18,7 @@ function shape_view(
     intersection::Intersection{F} = Intersection()
     data_types = DataType[]
     for data_var in data_variables
-        if hasfield(intersection_type, data_var)
+        if hasfield(Intersection, data_var)
             push!(data_types, eltype(getfield(intersection, data_var)))
         else
             error(
@@ -30,7 +30,7 @@ function shape_view(
     data_matrices = [zeros(T, screen_res...) for T in data_types]
     data = NamedTuple{Tuple(data_variables)}(Tuple(data_matrices))
 
-    intersections = Vector{Intersection{F}}[Intersection() for i in 1:nthreads()]
+    intersections = Intersection{F}[Intersection() for i in 1:nthreads()]
 
     @threads for I in CartesianIndices(data.t)
         intersection = intersections[threadid()]

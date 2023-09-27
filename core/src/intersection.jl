@@ -4,6 +4,10 @@ struct Intersection{F<:AbstractFloat}
     face::Vector{Int}
 end
 
+function Base.convert(::Type{Intersection{F}}, intersection::Intersection) where {F}
+    return Intersection{F}(intersection.t,intersection.dim,intersection.face)
+end
+
 function Intersection()::Intersection
     return Intersection([Inf], [0], [0])
 end
@@ -12,6 +16,7 @@ function reset_intersection!(intersection::Intersection)::Nothing
     intersection.t[1] = Inf
     intersection.dim[1] = 0
     intersection.face[1] = 0
+    return nothing
 end
 
 """
