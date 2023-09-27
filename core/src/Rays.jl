@@ -9,6 +9,7 @@ using StatsBase: countmap
 
 include("camera.jl")
 include("shape.jl")
+include("intersection.jl")
 include("render.jl")
 
 end # Rays
