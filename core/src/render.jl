@@ -34,8 +34,8 @@ function shape_view(
 
     @threads for I in CartesianIndices(data.t)
         intersection = intersections[threadid()]
-        ray = get_ray(camera, Tuple(I))
-        intersect!(ray, shape; intersection)
+        set_ray!(intersection.ray, camera, Tuple(I))
+        intersect!(intersection, shape)
         
         for data_var in data_variables
             getfield(data, data_var)[I] = getfield(intersection, data_var)[1]
@@ -156,7 +156,7 @@ function add_color!(
     @threads for I in CartesianIndices(metadata)
         metadata_value = metadata[I]
         if !iszero(metadata_value)
-            color[:, I] = color_palette[:, metadata_value]
+            color[:, I] = view(color_palette, :, metadata_value)
         end
     end
     return nothing

@@ -112,14 +112,23 @@ struct Ray{F<:AbstractFloat}
     dir::Vector{F}
 end
 
+function Ray()::Ray
+    return Ray(zeros(3), [1.0, 0.0, 0.0])
+end
+
+function Base.convert(::Type{Ray{F}}, ray::Ray) where {F}
+    return Ray{F}(ray.loc, ray.dir)
+end
+
 """
 Compute the location and direction of a ray emited from the camera for 
 the given pixel indices.
 """
-function get_ray(
+function set_ray!(
+    ray::Ray{F},
     camera::Camera{F},
     pixel_indices::Tuple{Int,Int},
-)::Ray{F} where {F}
+)::Nothing where {F}
     (; screen_dist, screen_size, screen_res, dir, loc, up, right, warp) = camera
 
     screen_dist = screen_dist[1]
@@ -132,14 +141,13 @@ function get_ray(
     s_h, s_w = screen_size
     res_h, res_w = screen_res
 
-    ray_loc = loc + screen_dist * dir
-    ray_loc -= ((i - 1) / (res_h - 1) - 0.5) * s_h * up
-    ray_loc += ((j - 1) / (res_w - 1) - 0.5) * s_w * right
+    @. ray.loc  = loc + screen_dist * dir
+    @. ray.loc -= ((i - 1) / (res_h - 1) - 0.5) * s_h * up
+    @. ray.loc += ((j - 1) / (res_w - 1) - 0.5) * s_w * right
 
-    ray_dir = ray_loc - loc
-    normalize!(ray_dir)
+    @. ray.dir = ray.loc - loc
+    normalize!(ray.dir)
+    warp(ray.loc)
 
-    warp(ray_loc)
-
-    return Ray{F}(ray_loc, ray_dir)
+    return nothing
 end
