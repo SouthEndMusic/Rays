@@ -5,44 +5,40 @@ Depending on the type of object, metadata of the intersections can be collected,
 for instance the intersection dimension for cubes.
 """
 function shape_view(
-    camera::Camera,
-    shape::Shape;
+    camera::Camera{F},
+    shape::Shape{F};
     data_variables::Vector{Symbol} = Symbol[],
-)::NamedTuple
+)::NamedTuple where {F}
 
     (; screen_res) = camera
-
-    intersection_default = get_default_intersection(shape)
-    intersection_type = typeof(intersection_default)
     if !(:t in data_variables)
         push!(data_variables, :t)
     end
 
+    intersection_example::Intersection{F} = Intersection()
     data_types = DataType[]
     for data_var in data_variables
-        if hasfield(intersection_type, data_var)
-            push!(data_types, eltype(getfield(intersection_default, data_var)))
+        if hasfield(Intersection, data_var)
+            push!(data_types, eltype(getfield(intersection_example, data_var)))
         else
-            error(
-                "Intersections with shapes of type $(typeof(shape)) have no metadata $data_var.",
-            )
+            error("Intersections cannot have metadata $data_var.")
         end
     end
 
     data_matrices = [zeros(T, screen_res...) for T in data_types]
     data = NamedTuple{Tuple(data_variables)}(Tuple(data_matrices))
 
-    intersections = [get_default_intersection(shape) for i in 1:nthreads()]
+    intersections = Intersection{F}[Intersection() for i = 1:nthreads()]
 
     @threads for I in CartesianIndices(data.t)
         intersection = intersections[threadid()]
-        ray = get_ray(camera, Tuple(I))
-        intersect!(ray, shape; intersection)
-        
+        set_ray!(intersection.ray, camera, Tuple(I))
+        intersect!(intersection, shape)
+
         for data_var in data_variables
             getfield(data, data_var)[I] = getfield(intersection, data_var)[1]
         end
-        set_default_intersection!(intersection)
+        reset_intersection!(intersection)
     end
 
     return data
@@ -56,9 +52,9 @@ If a color Array{Float64,3} is provided, this is multiplied by the grayscale can
 produce a colored image with varying brightness.
 """
 function cam_is_source(
-    t_int::AbstractMatrix{<:AbstractFloat};
+    t_int::AbstractMatrix{F};
     dropoff_curve::Union{Function,Nothing} = nothing,
-)::AbstractMatrix{<:AbstractFloat}
+)::AbstractMatrix{F} where {F}
 
     if isnothing(dropoff_curve)
         Max = maximum(x -> isinf(x) ? -Inf : x, t_int)
@@ -72,7 +68,7 @@ function cam_is_source(
     where_intersect = .!isinf.(t_int)
     t_int_noninf = t_int[where_intersect]
 
-    canvas_grayscale = zeros(Float64, size(t_int)...)
+    canvas_grayscale = zeros(F, size(t_int)...)
     canvas_grayscale[where_intersect] = @. curve(t_int_noninf)
 
     return canvas_grayscale
@@ -84,9 +80,9 @@ The distribution is based on integrating over pixels [i-1/2,i+1/2] ∩ [-p,p]
 the continuous distribution 
 f(x) = 15/16 (x^2-1)^2, x ∈ [-p,p].
 """
-function get_blur_kernel(p::AbstractFloat)::Tuple{AbstractVector{<:AbstractFloat},Int}
+function get_blur_kernel(p::F)::Tuple{AbstractVector{F},Int} where {F}
     Δi_max = Int(floor(p + 0.5))
-    kernel = zeros(2 * Δi_max + 1)
+    kernel = zeros(F, 2 * Δi_max + 1)
 
     Δi = -Δi_max:Δi_max
     arg_right = @. (Δi[2:end-1] + 0.5) / p
@@ -113,13 +109,13 @@ The depth of field effect is created by applying a kernel to pixel to
 is given by the focus curve at the intersection time at that pixel.
 """
 function add_depth_of_field(
-    canvas::AbstractArray{<:AbstractFloat,3},
-    t_int::AbstractMatrix{<:AbstractFloat},
+    canvas::AbstractArray{F,3},
+    t_int::AbstractMatrix{F},
     focus_curve,
-)::AbstractArray{AbstractFloat,3}
+)::AbstractArray{F,3} where {F}
 
     _, h, w = size(canvas)
-    canvas_new = zero(canvas)
+    canvas_new = zeros(F, size(canvas)...)
 
     @threads for I in CartesianIndices(t_int)
         if isinf(t_int[I])
@@ -151,14 +147,14 @@ metadata: a metadata value of n yields the nth color in color color_palette
 a metadata value of 0 yields no change in color
 """
 function add_color!(
-    color::AbstractArray{<:AbstractFloat,3},
-    color_palette::AbstractMatrix{<:AbstractFloat},
+    color::AbstractArray{F,3},
+    color_palette::AbstractMatrix{F},
     metadata::AbstractMatrix{Int},
-)::Nothing
+)::Nothing where {F}
     @threads for I in CartesianIndices(metadata)
         metadata_value = metadata[I]
         if !iszero(metadata_value)
-            color[:, I] = color_palette[:, metadata_value]
+            color[:, I] = view(color_palette, :, metadata_value)
         end
     end
     return nothing
@@ -168,14 +164,14 @@ end
 Multiply a grayscale canvas by a color array to get a color canvas.
 """
 function apply_color(
-    canvas_grayscale::AbstractMatrix{<:AbstractFloat},
-    color::AbstractArray{<:AbstractFloat,3},
-)::AbstractArray
+    canvas_grayscale::AbstractMatrix{F},
+    color::AbstractArray{F},
+)::AbstractArray{F,3} where {F}
     res_canvas_grayscale = size(canvas_grayscale)
     res_color = size(color)[2:3]
     @assert res_canvas_grayscale == res_color "canvas_grayscale and color must have the same resolution, got $res_canvas_grayscale and $res_color respectively."
 
-    canvas_color = zeros(Float64, size(color)...)
+    canvas_color = zeros(F, size(color)...)
 
     @threads for I in CartesianIndices(canvas_grayscale)
         @. canvas_color[:, I] = canvas_grayscale[I] * color[:, I]

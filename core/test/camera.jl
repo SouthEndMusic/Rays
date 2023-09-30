@@ -18,8 +18,8 @@ end
 
 @testset "look at" begin
     camera = Rays.Camera()
-    from = [0.2947051, 0.45194465, 0.05835851]
-    to = [0.21519046, 0.39008522, 0.3857729]
+    from = Float32[0.2947051, 0.45194465, 0.05835851]
+    to = Float32[0.21519046, 0.39008522, 0.3857729]
     Rays.look_at!(camera, from, to)
 
     @test camera.loc ≈ from
@@ -39,7 +39,7 @@ end
     )
 end
 
-@testset "get ray" begin
+@testset "set ray" begin
     camera = Rays.Camera()
     camera.screen_res .= [100, 100]
 
@@ -47,18 +47,21 @@ end
     to = Float32[0.87458175, 0.4226909, 0.0016991668]
     Rays.look_at!(camera, from, to)
 
-    ray = Rays.get_ray(camera, (24, 68))
+    ray::Rays.Ray{Float32} = Rays.Ray()
+    Rays.set_ray!(ray, camera, (24, 68))
     @test ray isa Rays.Ray
     @test ray.loc ≈ Float32[0.6436098, 0.8657537, 0.15174258]
     @test norm(ray.dir) ≈ 1.0
     @test ray.dir ≈ Float32[0.2724516, -0.96194667, 0.020704657]
 
-    @test_throws "Pixel indices must fall inside screen res [100, 100], got (0, 68)." Rays.get_ray(
+    @test_throws "Pixel indices must fall inside screen res [100, 100], got (0, 68)." Rays.set_ray!(
+        ray,
         camera,
         (0, 68),
     )
 
-    @test_throws "Pixel indices must fall inside screen res [100, 100], got (123, 68)." Rays.get_ray(
+    @test_throws "Pixel indices must fall inside screen res [100, 100], got (123, 68)." Rays.set_ray!(
+        ray,
         camera,
         (123, 68),
     )

@@ -8,16 +8,18 @@ using LinearAlgebra: normalize!
     sphere = Rays.Sphere(center, R)
     @test sphere isa Rays.Sphere
 
-    loc = zeros(3)
-    dir = ones(3)
-    normalize!(dir)
-    ray = Rays.Ray(loc, dir)
-    closer_intersection_found, intersection = Rays.intersect!(ray, sphere)
+    intersection = Rays.Intersection()
+    (; ray) = intersection
+    ray.loc .= 0.0
+    ray.dir .= 1.0
+    normalize!(ray.dir)
+    closer_intersection_found = Rays.intersect!(intersection, sphere)
     @test closer_intersection_found
     @test intersection.t[1] ≈ sqrt(3) - 0.5
 
-    ray.dir[:] = [0.0, 0.0, 1.0]
-    closer_intersection_found, intersection = Rays.intersect!(ray, sphere)
+    Rays.reset_intersection!(intersection)
+    ray.dir .= [0.0, 0.0, 1.0]
+    closer_intersection_found = Rays.intersect!(intersection, sphere)
     @test !closer_intersection_found
     @test intersection.t[1] == Inf
 end
@@ -28,12 +30,13 @@ end
     cube = Rays.Cube(center, R)
     @test cube isa Rays.Cube
 
-    loc = zeros(3)
-    dir = [0.0, 1.0, 0.0]
-    normalize!(dir)
-    ray = Rays.Ray(loc, dir)
+    intersection = Rays.Intersection()
+    (; ray) = intersection
+    ray.loc .= 0.0
+    ray.dir .= [0.0, 1.0, 0.0]
+    normalize!(ray.dir)
 
-    closer_intersection_found, intersection = Rays.intersect!(ray, cube)
+    closer_intersection_found = Rays.intersect!(intersection, cube)
     @test closer_intersection_found
     @test intersection.t[1] ≈ 1.5
     @test intersection.dim[1] == 2

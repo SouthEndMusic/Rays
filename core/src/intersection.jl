@@ -1,39 +1,39 @@
-abstract type Intersection end
-
-struct Intersection_plain{F<:AbstractFloat} <: Intersection
+struct Intersection{F<:AbstractFloat}
+    ray::Ray{F}
+    rays_transformed::Vector{Ray{F}}
     t::Vector{F}
+    # For cube intersections
+    dim::Vector{Int}
+    # For triangle intersections
+    u::Vector{F}
+    v::Vector{F}
+    diff::Vector{F}
+    diff2::Vector{F}
+    face::Vector{Int}
 end
 
-struct Intersection_with_dim{F<:AbstractFloat,I<:Integer} <: Intersection
-    t::Vector{F}
-    dim::Vector{I}
+function Base.convert(::Type{Intersection{F}}, intersection::Intersection) where {F}
+    return Intersection{F}(
+        [getfield(intersection, fieldname) for fieldname in fieldnames(Intersection)]...,
+    )
 end
 
-struct Intersection_with_face{F<:AbstractFloat,I<:Integer} <: Intersection
-    t::Vector{F}
-    face::Vector{I}
+function Intersection()::Intersection
+    return Intersection(
+        Ray(), # ray
+        Ray{Float64}[],
+        [Inf], # t 
+        [0], # dim 
+        zeros(3), # u
+        zeros(3), # v
+        zeros(3), # diff
+        zeros(3), # diff2
+        [0], # face
+    )
 end
 
-get_default_intersection(::Sphere{F}) where {F} = Intersection_plain{F}([Inf])
-get_default_intersection(::Cube{F}) where {F} = Intersection_with_dim{F,Int64}([Inf], [0])
-get_default_intersection(shape::FractalShape) = get_default_intersection(first(shape.subshapes))
-get_default_intersection(::TriangleShape{F,I}) where {F,I} =
-    Intersection_with_face{F,I}([Inf], [0])
-
-function set_default_intersection!(intersection::Intersection_plain)::Nothing
+function reset_intersection!(intersection::Intersection)::Nothing
     intersection.t[1] = Inf
-    return nothing
-end
-
-function set_default_intersection!(intersection::Intersection_with_dim)::Nothing
-    intersection.t[1] = Inf
-    intersection.dim[1] = 0
-    return nothing
-end
-
-function set_default_intersection!(intersection::Intersection_with_face)::Nothing
-    intersection.t[1] = Inf
-    intersection.face[1] = 0
     return nothing
 end
 
@@ -41,17 +41,9 @@ end
 Compute the intersection of a ray with a sphere as the smallest
 real solution to a quadratic polynomial, if it exists.
 """
-function intersect!(
-    ray::Ray{F},
-    sphere::Sphere;
-    intersection::Union{Intersection_plain{F}, Nothing} = nothing,
-)::Tuple{Bool,Intersection_plain{F}} where {F<:AbstractFloat}
-    (; loc, dir) = ray
+function intersect!(intersection::Intersection{F}, sphere::Sphere)::Bool where {F}
+    (; loc, dir) = intersection.ray
     (; center, Rsq) = sphere
-
-    if isnothing(intersection)
-        intersection = get_default_intersection(sphere)
-    end
 
     diff = loc - center
     a = norm(dir)^2
@@ -62,33 +54,26 @@ function intersect!(
     closer_intersection_found = false
 
     if discr >= 0
-        t_int_candidate = (-b - sqrt(discr)) / (2 * a) 
+        t_int_candidate = (-b - sqrt(discr)) / (2 * a)
         if t_int_candidate < intersection.t[1]
             closer_intersection_found = true
             intersection.t[1] = t_int_candidate
         end
     end
-    
-    return closer_intersection_found, intersection
+
+    return closer_intersection_found
 end
 
 """
 Compute the intersection of a ray with a cube by computing the intersections
 with each of the 6 face planes and then checking whether the intersection is within the face.
 """
-function intersect!(
-    ray::Ray{F},
-    cube::Cube{F};
-    intersection::Union{Intersection_with_dim{F,<:Integer}, Nothing} = nothing,
-)::Tuple{Bool,Intersection_with_dim{F,<:Integer}} where {F<:AbstractFloat}
-
-    if isnothing(intersection)
-        intersection = get_default_intersection(cube)
-    end
+function intersect!(intersection::Intersection{F}, cube::Cube{F})::Bool where {F}
+    (; ray) = intersection
 
     closer_intersection_found = false
 
-    for dim = 1:3
+    for dim ∈ 1:3
         bound_small = cube.center[dim] - cube.R
         diff_bound_small = bound_small - ray.loc[dim]
         dir_dim_positive = (ray.dir[dim] > 0) # dir_dim = 0 not taken into account
@@ -126,7 +111,8 @@ function intersect!(
                 other_dim += 1
 
                 if other_dim !== dim
-                    loc_int_other_dim_1 = ray.loc[other_dim] + t_int_candidate * ray.dir[other_dim]
+                    loc_int_other_dim_1 =
+                        ray.loc[other_dim] + t_int_candidate * ray.dir[other_dim]
                     if loc_int_other_dim_1 > cube.center[other_dim] + cube.R
                         candidate = false
                         continue
@@ -144,7 +130,7 @@ function intersect!(
             end
         end
     end
-    return closer_intersection_found, intersection
+    return closer_intersection_found
 end
 
 
@@ -154,21 +140,26 @@ This is done recursively until the recursion depth of the fractal shape.
 To compute the intersection of a ray with a subshape, the ray location is transformed.
 """
 function intersect!(
-    ray::Ray{F},
+    intersection::Intersection{F},
     fractal_shape::FractalShape{F};
-    intersection::Union{Intersection, Nothing} = nothing,
-    current_depth::Int = 0,
-)::Tuple{Bool,Intersection} where {F <: AbstractFloat}
+    current_depth::Int = 1,
+)::Bool where {F}
+    (; ray) = intersection
     (; subshapes, depth, shrink_factor) = fractal_shape
 
-    if isnothing(intersection)
-        intersection = get_default_intersection(first(fractal_shape.subshapes))
+    if current_depth == 1
+        for i = 1:depth
+            if length(intersection.rays_transformed) < i
+                push!(intersection.rays_transformed, ray)
+            end
+        end
     end
 
+    ray.loc .= intersection.rays_transformed[depth].loc
     subshape_intersect = nothing
 
     for subshape in subshapes
-        closer_intersection_found = intersect!(ray, subshape; intersection)[1]
+        closer_intersection_found = intersect!(intersection, subshape)
 
         if closer_intersection_found
             subshape_intersect = subshape
@@ -176,49 +167,49 @@ function intersect!(
     end
 
     if !isnothing(subshape_intersect) && current_depth < depth
-        set_default_intersection!(intersection)
-        loc_transformed =
-            shrink_factor * (ray.loc + fractal_shape.center - subshape_intersect.center)
-        ray_transformed = Ray(loc_transformed, ray.dir)
-        intersection.t[1] *= shrink_factor
-        closer_intersection_found = intersect!(ray_transformed, fractal_shape; intersection, current_depth = current_depth + 1)[1]
-        intersection.t[1] /= shrink_factor
-        # intersection_candidate =
-        #     intersect!(ray_transformed, fractal_shape; intersection, current_depth = current_depth + 1)
-        # intersection_candidate.t[1] /= shrink_factor
+        reset_intersection!(intersection)
+        ray_transformed = intersection.rays_transformed[current_depth+1]
+        ray_transformed.loc .= ray.loc
+        ray_transformed.loc .+= fractal_shape.center
+        ray_transformed.loc .-= subshape_intersect.center
+        ray_transformed.loc .*= shrink_factor
 
-        # if intersection_candidate.t < intersection.t
-        #     intersection = intersection_candidate
-        # end
+        intersection.t[1] *= shrink_factor
+        closer_intersection_found =
+            intersect!(intersection, fractal_shape, current_depth = current_depth + 1)
+        intersection.t[1] /= shrink_factor
     else
         closer_intersection_found = false
     end
 
-    return closer_intersection_found, intersection
+    return closer_intersection_found
 end
 
 """
 Compute the intersection of a ray with a triangle given by
 the triangle vertices.
 """
-function intersect(
-    ray::Ray{F},
+function intersect!(
+    intersection::Intersection{F},
     triangle_vertices::AbstractArray{F};
-    normal::Union{AbstractVector{F}, Nothing} = nothing,
-    t_int_prev::Union{F, Nothing} = nothing,
-)::F where {F<:AbstractFloat}
-    (; loc, dir) = ray
+    normal::Union{AbstractVector{F},Nothing} = nothing,
+    t_int_prev::Union{F,Nothing} = nothing,
+)::F where {F}
+    (; ray, diff, diff2, u, v) = intersection
+    (; loc, dir) = intersection.ray
 
     if isnothing(normal)
         c = view(triangle_vertices, 3, :)
-        u = view(triangle_vertices, 1, :) - c
-        v = view(triangle_vertices, 2, :) - c
-        normal = cross(u,v)
+        u .= view(triangle_vertices, 1, :) - c
+        v .= view(triangle_vertices, 2, :) - c
+        normal = cross(u, v)
         normalize!(normal)
     end
 
-    diff = view(triangle_vertices, 3, :) - loc
-    t_int_candidate = dot(diff, normal)/dot(dir, normal)
+    diff .= 0.0
+    diff .+= view(triangle_vertices, 3, :)
+    diff .-= loc
+    t_int_candidate = dot(diff, normal) / dot(dir, normal)
 
     if t_int_candidate < 0.0
         return t_int_prev
@@ -234,24 +225,28 @@ function intersect(
 
     if !isnothing(normal)
         c = view(triangle_vertices, 3, :)
-        u = view(triangle_vertices, 1, :) - c
-        v = view(triangle_vertices, 2, :) - c
+        u .= 0.0
+        v .= 0.0
+        u .+= view(triangle_vertices, 1, :)
+        v .+= view(triangle_vertices, 2, :)
+        u .-= c
+        v .-= c
     end
 
     u_normsq = dot(u, u)
     v_normsq = dot(v, v)
     inner_uv = dot(u, v)
     det = u_normsq * v_normsq - inner_uv^2
-    diff2 = @. t_int_candidate * ray.dir - diff
+    diff2 .= @. t_int_candidate * ray.dir - diff
     inner_u = dot(diff2, u)
     inner_v = dot(diff2, v)
-    λ_1 = (inner_u * v_normsq - inner_v * inner_uv)/det
+    λ_1 = (inner_u * v_normsq - inner_v * inner_uv) / det
 
     if !(0 ≤ λ_1 ≤ 1)
         return t_int_prev
     end
 
-    λ_2 = (inner_v * u_normsq - inner_u * inner_uv)/det
+    λ_2 = (inner_v * u_normsq - inner_u * inner_uv) / det
 
     if !(0 ≤ λ_2 ≤ 1)
         return t_int_prev
@@ -268,23 +263,20 @@ end
 Compute the intersection of a ray with a triangle shape
 as the smallest intersection time over all triangles.
 """
-function intersect!(
-    ray::Ray{F},
-    shape::TriangleShape{F};
-    intersection::Union{Intersection_with_face{F,<:Integer},Nothing} = nothing,
-)::Tuple{Bool,Intersection_with_face{F,<:Integer}} where {F<:AbstractFloat}
+function intersect!(intersection::Intersection{F}, shape::TriangleShape{F};)::Bool where {F}
     (; vertices, faces, normals) = shape
-
-    if isnothing(intersection)
-        intersection = default_intersection(shape)
-    end
 
     closer_intersection_found = false
 
-    for i = 1:shape.n_faces
+    for i ∈ 1:shape.n_faces
         triangle_vertices = view(vertices, view(faces, i, :), :)
         normal = view(normals, i, :)
-        t_int_candidate = intersect(ray, triangle_vertices; normal, t_int_prev = intersection.t[1])
+        t_int_candidate = intersect!(
+            intersection,
+            triangle_vertices;
+            normal,
+            t_int_prev = intersection.t[1],
+        )
         if t_int_candidate < intersection.t[1]
             closer_intersection_found = true
             intersection.t[1] = t_int_candidate
@@ -292,5 +284,5 @@ function intersect!(
         end
     end
 
-    return closer_intersection_found, intersection
+    return closer_intersection_found
 end

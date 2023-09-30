@@ -1,4 +1,4 @@
-abstract type Shape end
+abstract type Shape{F<:AbstractFloat} end
 
 # Intersection types only contain one value per field, but they are vectors to make them mutable.
 
@@ -6,15 +6,15 @@ abstract type Shape end
 Get default values for the metadata of the intersection of
 a certain shape for when there is no intersection.
 """
-struct Sphere{F<:AbstractFloat} <: Shape
+struct Sphere{F} <: Shape{F}
     center::Vector{F}
     R::F
     Rsq::F
 end
 
-Sphere(center::Vector{F}, R::F) where {F<:AbstractFloat} = Sphere(center, R, R^2)
+Sphere(center::Vector{F}, R::F) where {F} = Sphere(center, R, R^2)
 
-struct Cube{F<:AbstractFloat} <: Shape
+struct Cube{F} <: Shape{F}
     center::Vector{F}
     R::F
 end
@@ -27,9 +27,9 @@ depth: the maximal recursion depth
 shrink_factor: the factor by which all lengths decrease for a substitution
 subshapes: the set of shapes that a shape is substituted with for a recursion step
 """
-struct FractalShape{F<:AbstractFloat,I<:Integer,S<:Shape} <: Shape
+struct FractalShape{F,S<:Shape} <: Shape{F}
     center::Vector{F}
-    depth::I
+    depth::Int
     shrink_factor::F
     subshapes::Vector{S}
 end
@@ -41,8 +41,8 @@ with the subshapes array automatically generated.
 function Menger_sponge(
     center::Vector{F},
     R::AbstractFloat,
-    depth::I,
-)::FractalShape{F,I,Cube{F}} where {F<:AbstractFloat,I<:Integer}
+    depth::Int,
+)::FractalShape{F,Cube{F}} where {F}
     subcubes = Cube{F}[]
     R_subcube = R / 3
     R_subcube = convert(F, R_subcube)
@@ -59,7 +59,7 @@ function Menger_sponge(
         subcube = Cube(center_subcube, R_subcube)
         push!(subcubes, subcube)
     end
-    return FractalShape{F,I,Cube{F}}(center, depth, 3.0, subcubes)
+    return FractalShape{F,Cube{F}}(center, depth, 3.0, subcubes)
 end
 
 """
@@ -72,31 +72,35 @@ n_vertices: The number of vertices
 n_faces: the number of faces
 convex: Whether the triangles enclose a convex volume.
 """
-struct TriangleShape{F<:AbstractFloat,I<:Integer} <: Shape
+struct TriangleShape{F} <: Shape{F}
     vertices::Matrix{F} # (n_vertices, 3)
-    faces::Matrix{I} # (n_faces, 3)
+    faces::Matrix{Int} # (n_faces, 3)
     normals::Matrix{F} # (n_faces, 3)
     center::Vector{F}
-    n_vertices::I
-    n_faces::I
+    n_vertices::Int
+    n_faces::Int
     convex::Bool
 end
 
 """
 Construct a triangle shape where the normals are computed automatically from the vertices.
 """
-function TriangleShape(vertices::Matrix{F}, faces::Matrix{I}, center::Vector{F}; convex::Bool = false)::TriangleShape{F,I} where {F<:AbstractFloat,I<:Integer}
-
+function TriangleShape(
+    vertices::Matrix{F},
+    faces::Matrix{Int},
+    center::Vector{F};
+    convex::Bool = false,
+)::TriangleShape{F} where {F}
     n_vertices = size(vertices)[1]
     n_faces = size(faces)[1]
     normals = zeros(F, n_faces, 3)
 
     @threads for i = 1:n_faces
-        u = vertices[faces[i,1],:] - vertices[faces[i,3],:]
-        v = vertices[faces[i,2],:] - vertices[faces[i,3],:]
-        n = cross(u,v)
+        u = vertices[faces[i, 1], :] - vertices[faces[i, 3], :]
+        v = vertices[faces[i, 2], :] - vertices[faces[i, 3], :]
+        n = cross(u, v)
         normalize!(n)
-        normals[i,:] = n
+        normals[i, :] = n
     end
 
     return TriangleShape(vertices, faces, normals, center, n_vertices, n_faces, convex)
@@ -105,7 +109,7 @@ end
 """
 Construct a tetrahedron as a triangle shape with given center and radius.
 """
-function Tetrahedron(center::Vector{F}, R::F)::TriangleShape{F} where {F<:AbstractFloat}
+function Tetrahedron(center::Vector{F}, R::F)::TriangleShape{F} where {F}
     vertices = zeros(F, 4, 3)
     vertices[4, :] .= center + [0.0, 0.0, R]
 
@@ -130,8 +134,8 @@ with the subshapes array automatically generated.
 function Sierpinski_pyramid(
     center::Vector{F},
     R::AbstractFloat,
-    depth::I,
-)::FractalShape{F,I,TriangleShape{F}} where {F<:AbstractFloat,I<:Integer}
+    depth::Int,
+)::FractalShape{F,TriangleShape{F}} where {F}
     subtetrahedra = TriangleShape{F}[]
     R_subtetrahedron = convert(F, R / 2)
 
