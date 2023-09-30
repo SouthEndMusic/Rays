@@ -91,10 +91,7 @@ end
 """
 Get an Array{Float64} with the resolution of the provided camera.
 """
-function get_canvas(
-    camera::Camera{F};
-    color::Bool = false,
-)::Array{F} where {F}
+function get_canvas(camera::Camera{F}; color::Bool = false)::Array{F} where {F}
 
     return if color
         zeros(F, 3, camera.screen_res...)
@@ -141,7 +138,7 @@ function set_ray!(
     s_h, s_w = screen_size
     res_h, res_w = screen_res
 
-    @. ray.loc  = loc + screen_dist * dir
+    @. ray.loc = loc + screen_dist * dir
     @. ray.loc -= ((i - 1) / (res_h - 1) - 0.5) * s_h * up
     @. ray.loc += ((j - 1) / (res_w - 1) - 0.5) * s_w * right
 

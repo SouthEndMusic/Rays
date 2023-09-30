@@ -85,17 +85,22 @@ end
 """
 Construct a triangle shape where the normals are computed automatically from the vertices.
 """
-function TriangleShape(vertices::Matrix{F}, faces::Matrix{Int}, center::Vector{F}; convex::Bool = false)::TriangleShape{F} where {F}
+function TriangleShape(
+    vertices::Matrix{F},
+    faces::Matrix{Int},
+    center::Vector{F};
+    convex::Bool = false,
+)::TriangleShape{F} where {F}
     n_vertices = size(vertices)[1]
     n_faces = size(faces)[1]
     normals = zeros(F, n_faces, 3)
 
     @threads for i = 1:n_faces
-        u = vertices[faces[i,1],:] - vertices[faces[i,3],:]
-        v = vertices[faces[i,2],:] - vertices[faces[i,3],:]
-        n = cross(u,v)
+        u = vertices[faces[i, 1], :] - vertices[faces[i, 3], :]
+        v = vertices[faces[i, 2], :] - vertices[faces[i, 3], :]
+        n = cross(u, v)
         normalize!(n)
-        normals[i,:] = n
+        normals[i, :] = n
     end
 
     return TriangleShape(vertices, faces, normals, center, n_vertices, n_faces, convex)

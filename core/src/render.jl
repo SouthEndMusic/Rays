@@ -21,22 +21,20 @@ function shape_view(
         if hasfield(Intersection, data_var)
             push!(data_types, eltype(getfield(intersection_example, data_var)))
         else
-            error(
-                "Intersections cannot have no metadata $data_var.",
-            )
+            error("Intersections cannot have metadata $data_var.")
         end
     end
 
     data_matrices = [zeros(T, screen_res...) for T in data_types]
     data = NamedTuple{Tuple(data_variables)}(Tuple(data_matrices))
 
-    intersections = Intersection{F}[Intersection() for i in 1:nthreads()]
+    intersections = Intersection{F}[Intersection() for i = 1:nthreads()]
 
     @threads for I in CartesianIndices(data.t)
         intersection = intersections[threadid()]
         set_ray!(intersection.ray, camera, Tuple(I))
         intersect!(intersection, shape)
-        
+
         for data_var in data_variables
             getfield(data, data_var)[I] = getfield(intersection, data_var)[1]
         end
@@ -117,7 +115,7 @@ function add_depth_of_field(
 )::AbstractArray{F,3} where {F}
 
     _, h, w = size(canvas)
-    canvas_new = zeros(F,size(canvas)...)
+    canvas_new = zeros(F, size(canvas)...)
 
     @threads for I in CartesianIndices(t_int)
         if isinf(t_int[I])
