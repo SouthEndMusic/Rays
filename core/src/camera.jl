@@ -88,6 +88,17 @@ function look_at!(
     return nothing
 end
 
+function look_at!(camera::Camera{F}, to::AbstractVector{F}, dist::AbstractFloat, θ::AbstractFloat, ϕ::AbstractFloat)::Nothing where {F}
+    from = to + dist * [
+        cos(θ) * sin(ϕ)
+        sin(θ) * sin(ϕ)
+        cos(ϕ)
+    ]
+    from = convert(Vector{F}, from)
+    look_at!(camera, from, to)
+    return nothing
+end
+
 """
 Get an Array{Float64} with the resolution of the provided camera.
 """
