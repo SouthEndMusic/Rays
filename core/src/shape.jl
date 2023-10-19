@@ -50,7 +50,7 @@ function Menger_sponge(
     for ordinals in product(1:3, 1:3, 1:3)
         ordinals = collect(ordinals)
         m = countmap(ordinals)
-        if 2 ∈ keys(m) && countmap(ordinals)[2] > 1
+        if count(x -> x == 2, ordinals) > 1
             continue
         end
         center_subcube = @. center + (ordinals - 2) * 2 * R_subcube
