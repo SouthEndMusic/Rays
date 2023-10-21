@@ -6,14 +6,16 @@ mutable struct Interactor{F<:AbstractFloat}
     scene::Scene{F}
     parameters::Parameters{F}
     get_render::Function
-    affect_parameters!::Function
+    affect_parameters_input!::Function
+    affect_parameters_time!::Function
     dtimer::Dtimer
 end
 
 function Interactor(
     scene::Scene{F},
     parameters::Parameters{F},
-    affect_parameters!::Function,
+    affect_parameters_input!::Function,
+    affect_parameters_time!::Function,
     get_render::Function;
     window_name::String = "Interactive rendering",
 )::Interactor{F} where {F}
@@ -40,7 +42,8 @@ function Interactor(
         scene,
         parameters,
         get_render,
-        affect_parameters!,
+        affect_parameters_input!,
+        affect_parameters_time!,
         dtimer,
     )
 end
@@ -73,12 +76,30 @@ function set_render!(interactor::Interactor)::Nothing
 end
 
 function run!(interactor::Interactor)::Nothing
-    (; dtimer, parameters, affect_parameters!, renderer, window) = interactor
+    (;
+        dtimer,
+        parameters,
+        affect_parameters_input!,
+        affect_parameters_time!,
+        renderer,
+        window,
+    ) = interactor
     close = false
     try
         while !close
+            changed = false
             Δt = get_Δt!(dtimer)
-            (changed, close) = affect_parameters!(parameters, Δt)
+            changed |= affect_parameters_time!(parameters, Δt)
+            event_ref = Ref{SDL.SDL_Event}()
+            while Bool(SDL.SDL_PollEvent(event_ref))
+                event = event_ref[]
+                if event.type == SDL.SDL_QUIT
+                    close = true
+                    break
+                else
+                    changed |= affect_parameters_input!(parameters, event, Δt)
+                end
+            end
             if changed
                 set_render!(interactor)
             end
