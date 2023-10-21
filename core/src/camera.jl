@@ -88,7 +88,13 @@ function look_at!(
     return nothing
 end
 
-function look_at!(camera::Camera{F}, to::AbstractVector{F}, dist::AbstractFloat, θ::AbstractFloat, ϕ::AbstractFloat)::Nothing where {F}
+function look_at!(
+    camera::Camera{F},
+    to::AbstractVector{F},
+    dist::AbstractFloat,
+    θ::AbstractFloat,
+    ϕ::AbstractFloat,
+)::Nothing where {F}
     from = to + dist * [
         cos(θ) * sin(ϕ)
         sin(θ) * sin(ϕ)

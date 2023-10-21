@@ -49,7 +49,6 @@ function Menger_sponge(
 
     for ordinals in product(1:3, 1:3, 1:3)
         ordinals = collect(ordinals)
-        m = countmap(ordinals)
         if count(x -> x == 2, ordinals) > 1
             continue
         end

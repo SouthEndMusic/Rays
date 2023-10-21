@@ -5,11 +5,14 @@ Depending on the type of object, metadata of the intersections can be collected,
 for instance the intersection dimension for cubes.
 """
 function shape_view(
-    camera::Camera{F},
-    shape::Shape{F};
+    scene::Scene{F};
     data_variables::Vector{Symbol} = Symbol[],
+    camera_index::Int = 1,
+    shape_index::Int = 1,
 )::NamedTuple where {F}
 
+    camera = scene.cameras[camera_index]
+    shape = scene.shapes[shape_index]
     (; screen_res) = camera
     if !(:t in data_variables)
         push!(data_variables, :t)
