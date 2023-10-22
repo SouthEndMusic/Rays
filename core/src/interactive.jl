@@ -104,7 +104,7 @@ function run!(interactor::Interactor)::Nothing
         while !close
             parameters_changed = false
             Δt = get_Δt!(dtimer)
-            changed |= affect_parameters_time!(parameters, Δt)
+            parameters_changed |= affect_parameters_time!(parameters, Δt)
             event_ref = Ref{SDL.SDL_Event}()
             while Bool(SDL.SDL_PollEvent(event_ref))
                 event = event_ref[]
