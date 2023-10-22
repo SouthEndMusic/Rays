@@ -4,47 +4,35 @@ If there is no intersection the intersection time is Inf.
 Depending on the type of object, metadata of the intersections can be collected,
 for instance the intersection dimension for cubes.
 """
-function shape_view(
+function shape_view!(
     scene::Scene{F};
-    data_variables::Vector{Symbol} = Symbol[],
     camera_index::Int = 1,
     shape_index::Int = 1,
-)::NamedTuple where {F}
+)::Nothing where {F}
 
     camera = scene.cameras[camera_index]
+    (; intersection_data_float, intersection_data_int) = camera
+    data_variables_float = keys(intersection_data_float)
+    data_variables_int = keys(intersection_data_int)
+
     shape = scene.shapes[shape_index]
-    (; screen_res) = camera
-    if !(:t in data_variables)
-        push!(data_variables, :t)
-    end
-
-    intersection_example::Intersection{F} = Intersection()
-    data_types = DataType[]
-    for data_var in data_variables
-        if hasfield(Intersection, data_var)
-            push!(data_types, eltype(getfield(intersection_example, data_var)))
-        else
-            error("Intersections cannot have metadata $data_var.")
-        end
-    end
-
-    data_matrices = [zeros(T, screen_res...) for T in data_types]
-    data = NamedTuple{Tuple(data_variables)}(Tuple(data_matrices))
-
     intersections = Intersection{F}[Intersection() for i = 1:nthreads()]
 
-    @threads for I in CartesianIndices(data.t)
+    @threads for I in CartesianIndices(intersection_data_float[:t])
         intersection = intersections[threadid()]
         set_ray!(intersection.ray, camera, Tuple(I))
         intersect!(intersection, shape)
 
-        for data_var in data_variables
-            getfield(data, data_var)[I] = getfield(intersection, data_var)[1]
+        for data_var_float in data_variables_float
+            intersection_data_float[data_var_float][I] = getfield(intersection, data_var_float)[1]
+        end
+        for data_var_int in data_variables_int
+            intersection_data_int[data_var_int][I] = getfield(intersection, data_var_int)[1]
         end
         reset_intersection!(intersection)
     end
 
-    return data
+    return nothing
 end
 
 """
@@ -54,11 +42,15 @@ based on its distance to the camera.
 If a color Array{Float64,3} is provided, this is multiplied by the grayscale canvas to
 produce a colored image with varying brightness.
 """
-function cam_is_source(
-    t_int::AbstractMatrix{F};
+function cam_is_source!(
+    cam::Camera{F};
     dropoff_curve::Union{Function,Nothing} = nothing,
-)::AbstractMatrix{F} where {F}
+)::Nothing where {F}
+    (; canvas_grayscale, intersection_data_float) = cam
+    t_int = intersection_data_float[:t]
 
+    # Create a dropoff curve from the closest intersection to the
+    # furthest intersection fi no dropoff_curve is given
     if isnothing(dropoff_curve)
         Max = maximum(x -> isinf(x) ? -Inf : x, t_int)
         Min = minimum(t_int)
@@ -71,10 +63,10 @@ function cam_is_source(
     where_intersect = .!isinf.(t_int)
     t_int_noninf = t_int[where_intersect]
 
-    canvas_grayscale = zeros(F, size(t_int)...)
+    canvas_grayscale .= 0.0
     canvas_grayscale[where_intersect] = @. curve(t_int_noninf)
 
-    return canvas_grayscale
+    return nothing
 end
 
 """
@@ -111,7 +103,7 @@ The depth of field effect is created by applying a kernel to pixel to
 'smear out' its value over the neighbouring pixels, where the spread
 is given by the focus curve at the intersection time at that pixel.
 """
-function add_depth_of_field(
+function add_depth_of_field!(
     canvas::AbstractArray{F,3},
     t_int::AbstractMatrix{F},
     focus_curve,
@@ -149,15 +141,20 @@ color_palette: (3, n_colors) array
 metadata: a metadata value of n yields the nth color in color color_palette
 a metadata value of 0 yields no change in color
 """
-function add_color!(
-    color::AbstractArray{F,3},
+function get_color!(
+    cam::Camera{F},
+    variable::Symbol,
     color_palette::AbstractMatrix{F},
-    metadata::AbstractMatrix{Int},
 )::Nothing where {F}
-    @threads for I in CartesianIndices(metadata)
-        metadata_value = metadata[I]
-        if !iszero(metadata_value)
-            color[:, I] = view(color_palette, :, metadata_value)
+    (; color, intersection_data_int) = cam
+    if variable ∉ keys(intersection_data_int)
+        error("Integer intersection data of variable '$variable' has not been collected.")
+    end
+    data = intersection_data_int[variable]
+    @threads for I in CartesianIndices(data)
+        data_value = data[I]
+        if !iszero(data_value)
+            color[:, I] = view(color_palette, :, data_value)
         end
     end
     return nothing
@@ -166,19 +163,10 @@ end
 """
 Multiply a grayscale canvas by a color array to get a color canvas.
 """
-function apply_color(
-    canvas_grayscale::AbstractMatrix{F},
-    color::AbstractArray{F},
-)::AbstractArray{F,3} where {F}
-    res_canvas_grayscale = size(canvas_grayscale)
-    res_color = size(color)[2:3]
-    @assert res_canvas_grayscale == res_color "canvas_grayscale and color must have the same resolution, got $res_canvas_grayscale and $res_color respectively."
-
-    canvas_color = zeros(F, size(color)...)
-
+function apply_color!(cam::Camera{F})::Nothing where {F}
+    (; canvas_grayscale, color, canvas_color) = cam
     @threads for I in CartesianIndices(canvas_grayscale)
         @. canvas_color[:, I] = canvas_grayscale[I] * color[:, I]
     end
-
-    return canvas_color
+    return nothing
 end

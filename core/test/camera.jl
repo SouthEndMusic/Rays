@@ -13,7 +13,7 @@ using LinearAlgebra: cross, norm
 
     @test camera isa Rays.Camera
     @test camera.right == cross(camera.dir, camera.up)
-    @test camera.warp == identity
+    @test camera.warp! == identity
 end
 
 @testset "look at" begin
