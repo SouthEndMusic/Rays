@@ -82,7 +82,7 @@ function intersect!(intersection::Intersection{F}, cube::Cube{F})::Bool where {F
             if dir_dim_positive
                 t_int_candidate = diff_bound_small / ray.dir[dim]
             else
-                return intersection
+                return closer_intersection_found
             end
         else
             bound_big = cube.center[dim] + cube.R
@@ -96,7 +96,7 @@ function intersect!(intersection::Intersection{F}, cube::Cube{F})::Bool where {F
                 end
             else
                 if dir_dim_positive
-                    return intersection
+                    return closer_intersection_found
                 else
                     t_int_candidate = diff_bound_big / ray.dir[dim]
                 end

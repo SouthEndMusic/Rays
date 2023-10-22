@@ -7,8 +7,8 @@ version = "0.1.0"
 Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
 IterTools = "c8e1da08-722c-5040-9ed9-7db0dc04731e"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
-StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+SDL2_jll = "ab825dc5-c88e-5901-9575-1e5e20358fcf"
+SimpleDirectMediaLayer = "98e33af6-2ee5-5afd-9e75-cbc738b767c4"
 
 [extras]
 SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
