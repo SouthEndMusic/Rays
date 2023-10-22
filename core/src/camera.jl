@@ -58,7 +58,7 @@ end
 
 
 """
-Point the camera with the given cam_index from 'from' to 'to'. 
+Point the camera from 'from' to 'to'. 
 'up' is defined to be a linear combination of unit length of
 e_z = [0,0,1] and di,r and orthogonal to dir. This does not work if dir and e_z are proportional,
 e.g. the camera points straight up or straight down.
@@ -88,6 +88,9 @@ function look_at!(
     return nothing
 end
 
+"""
+Point the camera to 'to' from 'to' plus the spherical coordinates given by dist, θ and ϕ.
+"""
 function look_at!(
     camera::Camera{F},
     to::AbstractVector{F},
@@ -126,10 +129,16 @@ struct Ray{F<:AbstractFloat}
     dir::Vector{F}
 end
 
+"""
+Construct a ray.
+"""
 function Ray()::Ray
     return Ray(zeros(3), [1.0, 0.0, 0.0])
 end
 
+"""
+Convert between rays with different type parameters.
+"""
 function Base.convert(::Type{Ray{F}}, ray::Ray) where {F}
     return Ray{F}(ray.loc, ray.dir)
 end

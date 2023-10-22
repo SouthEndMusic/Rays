@@ -1,5 +1,8 @@
 abstract type Parameters{F<:AbstractFloat} end
 
+"""
+Object with all the data for interactive rendering.
+"""
 mutable struct Interactor{F<:AbstractFloat}
     window::Ptr{SDL_Window}
     renderer::Ptr{SDL_Renderer}
@@ -11,6 +14,9 @@ mutable struct Interactor{F<:AbstractFloat}
     dtimer::Dtimer
 end
 
+"""
+Construct an interactor.
+"""
 function Interactor(
     scene::Scene{F},
     parameters::Parameters{F},
@@ -48,10 +54,16 @@ function Interactor(
     )
 end
 
+"""
+Conver between SDL and julia booleans.
+"""
 function Base.convert(::Type{SDL.LibSDL2.SDL_bool}, bool::Bool)
     return bool ? SDL.SDL_TRUE : SDL.SDL_FALSE
 end
 
+"""
+Compute a render and put it to the SDL window.
+"""
 function set_render!(interactor::Interactor)::Nothing
     (; renderer, scene, parameters, get_render) = interactor
     render = convert.(UInt8, round.(255 .* get_render(scene, parameters)))
@@ -75,6 +87,9 @@ function set_render!(interactor::Interactor)::Nothing
     return nothing
 end
 
+"""
+The main loop of interactive rendering.
+"""
 function run!(interactor::Interactor)::Nothing
     (;
         dtimer,
@@ -87,7 +102,7 @@ function run!(interactor::Interactor)::Nothing
     close = false
     try
         while !close
-            changed = false
+            parameters_changed = false
             Δt = get_Δt!(dtimer)
             changed |= affect_parameters_time!(parameters, Δt)
             event_ref = Ref{SDL.SDL_Event}()
@@ -97,10 +112,10 @@ function run!(interactor::Interactor)::Nothing
                     close = true
                     break
                 else
-                    changed |= affect_parameters_input!(parameters, event, Δt)
+                    parameters_changed |= affect_parameters_input!(parameters, event, Δt)
                 end
             end
-            if changed
+            if parameters_changed
                 set_render!(interactor)
             end
         end
