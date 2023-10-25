@@ -10,3 +10,6 @@
 
 # Experiments folder
 experiments
+
+# formatting
+format.jl

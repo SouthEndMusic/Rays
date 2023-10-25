@@ -7,11 +7,11 @@ right: The right direction
 screen_size: The size of the screen in world units
 screen_dist: The distance between loc and the image plane
 screen_res: The resolution of the resulting render
-warp: A function which changes the origin of rays as they leave the camera
+warp!: A function which changes the origin of rays as they leave the camera
 
 dir, up and right are orthormal and completely fix the orientation of the camera.
 """
-struct Camera{F<:AbstractFloat}
+struct Camera{F<:AbstractFloat,W<:Function}
     loc::Vector{F}
     dir::Vector{F}
     up::Vector{F}
@@ -19,7 +19,12 @@ struct Camera{F<:AbstractFloat}
     screen_size::Vector{F} # height, width
     screen_dist::Vector{F}
     screen_res::Vector{Int} # height, width
-    warp::Function
+    canvas_grayscale::Array{F,2}
+    color::Array{F,3}
+    canvas_color::Array{F,3}
+    warp!::W
+    intersection_data_float::Dict{Symbol,Matrix{F}}
+    intersection_data_int::Dict{Symbol,Matrix{Int}}
     function Camera(
         loc::Vector{F},
         dir::Vector{F},
@@ -27,33 +32,115 @@ struct Camera{F<:AbstractFloat}
         right::Vector{F},
         screen_size::Vector{F},
         screen_dist::Vector{F},
-        screen_res,
-        warp,
-    ) where {F}
-        return new{F}(loc, dir, up, right, screen_size, screen_dist, screen_res, warp)
+        screen_res::Vector{Int},
+        canvas_grayscale::Array{F,2},
+        color::Array{F,3},
+        canvas_color::Array{F,3},
+        warp!::W,
+        intersection_data_float::Dict{Symbol,Matrix{F}},
+        intersection_data_int::Dict{Symbol,Matrix{Int}},
+    ) where {F,W}
+        return new{F,W}(
+            loc,
+            dir,
+            up,
+            right,
+            screen_size,
+            screen_dist,
+            screen_res,
+            canvas_grayscale,
+            color,
+            canvas_color,
+            warp!,
+            intersection_data_float,
+            intersection_data_int,
+        )
     end
+end
+
+const valid_intersection_data_variables_float = [:t]
+const valid_intersection_data_variables_int = [:dim, :face]
+
+function add_intersection_data_variables!(
+    cam::Camera{F},
+    variables::Vector{Symbol},
+)::Nothing where {F}
+    (; intersection_data_float, intersection_data_int) = cam
+    for var in variables
+        if var in valid_intersection_data_variables_float
+            if var ∉ keys(intersection_data_float)
+                intersection_data_float[var] = zeros(F, cam.screen_res...)
+            end
+        elseif var in valid_intersection_data_variables_int
+            if var ∉ keys(intersection_data_int)
+                intersection_data_int[var] = zeros(Int, cam.screen_res...)
+            end
+        else
+            @warn "Encountered invalid intersection data variable '$var', skipped."
+        end
+    end
+    return nothing
 end
 
 """
 Construct a camera object where the 'right' vector is computed using the cross product.
 """
-function Camera(loc, dir, up, screen_size, screen_dist, screen_res; warp = nothing)::Camera
+function Camera(
+    loc::Vector{F},
+    dir::Vector{F},
+    up::Vector{F},
+    screen_size::Vector{F},
+    screen_dist::Vector{F},
+    screen_res::Vector{Int};
+    intersection_data_variables::Vector{Symbol} = [:t],
+    warp!::Union{Function,Nothing} = nothing,
+)::Camera where {F}
     right = cross(dir, up)
 
-    warp = isnothing(warp) ? identity : warp
+    warp! = isnothing(warp!) ? identity : warp!
 
-    return Camera(loc, dir, up, right, screen_size, screen_dist, screen_res, warp)
+    canvas_grayscale = zeros(F, screen_res...)
+    color = zeros(F, 3, screen_res...)
+    canvas_color = zeros(F, 3, screen_res...)
+
+    intersection_data_float = Dict{Symbol,Matrix{F}}()
+    intersection_data_int = Dict{Symbol,Matrix{Int}}()
+    camera = Camera(
+        loc,
+        dir,
+        up,
+        right,
+        screen_size,
+        screen_dist,
+        screen_res,
+        canvas_grayscale,
+        color,
+        canvas_color,
+        warp!,
+        intersection_data_float,
+        intersection_data_int,
+    )
+
+    if :t ∉ intersection_data_variables
+        push!(intersection_data_variables, :t)
+    end
+    add_intersection_data_variables!(camera, unique(intersection_data_variables))
+
+    return camera
 end
 
 """
 Get a default camera instance
 """
-function Camera(; float_type = Float32)::Camera{<:AbstractFloat}
+function Camera(;
+    screen_res::Vector{Int} = [100, 100],
+    intersection_data_variables::Vector{Symbol} = [:t],
+    float_type = Float32,
+)::Camera
     default_values_float =
         Vector{float_type}[zeros(3), [1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.1, 0.1], [0.1]]
-    screen_res = [100, 100]
 
-    return Camera(default_values_float..., screen_res; warp = identity)
+    return Camera(default_values_float..., screen_res; intersection_data_variables)
 end
 
 
@@ -109,18 +196,6 @@ function look_at!(
 end
 
 """
-Get an Array{Float64} with the resolution of the provided camera.
-"""
-function get_canvas(camera::Camera{F}; color::Bool = false)::Array{F} where {F}
-
-    return if color
-        zeros(F, 3, camera.screen_res...)
-    else
-        zeros(F, camera.screen_res...)
-    end
-end
-
-"""
 loc: The origin of the ray 
 dir: The direction of the ray (unit vector)
 """
@@ -152,13 +227,9 @@ function set_ray!(
     camera::Camera{F},
     pixel_indices::Tuple{Int,Int},
 )::Nothing where {F}
-    (; screen_dist, screen_size, screen_res, dir, loc, up, right, warp) = camera
+    (; screen_dist, screen_size, screen_res, dir, loc, up, right, warp!) = camera
 
     screen_dist = screen_dist[1]
-
-    if !(all(pixel_indices .> 0) && all(pixel_indices .<= screen_res))
-        error("Pixel indices must fall inside screen res $screen_res, got $pixel_indices.")
-    end
 
     i, j = pixel_indices
     s_h, s_w = screen_size
@@ -170,7 +241,7 @@ function set_ray!(
 
     @. ray.dir = ray.loc - loc
     normalize!(ray.dir)
-    warp(ray.loc)
+    warp!(ray.loc)
 
     return nothing
 end
