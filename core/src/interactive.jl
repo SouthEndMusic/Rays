@@ -59,6 +59,7 @@ function Interactor(
         render_UINT8,
         scene,
         parameters,
+        # Not sure why these conversions do not happen automatically
         GetRender{F, P}(get_render),
         AffectParametersInput{F, P}(affect_parameters_input!),
         AffectParametersTime{F, P}(affect_parameters_time!),
