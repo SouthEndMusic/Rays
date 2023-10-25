@@ -23,11 +23,16 @@ function shape_view!(
         set_ray!(intersection.ray, camera, Tuple(I))
         intersect!(intersection, shape)
 
-        for data_var_float in data_variables_float
-            intersection_data_float[data_var_float][I] = getfield(intersection, data_var_float)[1]
+        # These are written out explicitly per variable
+        # because looping leads to runtime-dispatch
+        if :t in data_variables_float
+            intersection_data_float[:t][I] = intersection.t[1]
         end
-        for data_var_int in data_variables_int
-            intersection_data_int[data_var_int][I] = getfield(intersection, data_var_int)[1]
+        if :dim in data_variables_int
+            intersection_data_int[:dim][I] = intersection.dim[1]
+        end
+        if :face in data_variables_int
+            intersection_data_int[:face][I] = intersection.face[1]
         end
         reset_intersection!(intersection)
     end
@@ -103,14 +108,13 @@ The depth of field effect is created by applying a kernel to pixel to
 'smear out' its value over the neighbouring pixels, where the spread
 is given by the focus curve at the intersection time at that pixel.
 """
-function add_depth_of_field!(
-    canvas::AbstractArray{F,3},
-    t_int::AbstractMatrix{F},
-    focus_curve,
-)::AbstractArray{F,3} where {F}
+function add_depth_of_field!(camera::Camera{F}, focus_curve::Function)::Nothing where {F}
 
-    _, h, w = size(canvas)
-    canvas_new = zeros(F, size(canvas)...)
+    (; canvas_color, intersection_data_float) = camera
+
+    _, h, w = size(canvas_color)
+    t_int = intersection_data_float[:t]
+    canvas_new = zeros(F, size(canvas_color)...)
 
     @threads for I in CartesianIndices(t_int)
         if isinf(t_int[I])
@@ -127,12 +131,13 @@ function add_depth_of_field!(
                     continue
                 end
                 @. canvas_new[:, i_abs, j_abs] +=
-                    canvas[:, i, j] * kernel[Δi_max+Δi+1] * kernel[Δi_max+Δj+1]
+                    canvas_color[:, i, j] * kernel[Δi_max+Δi+1] * kernel[Δi_max+Δj+1]
             end
         end
     end
 
-    return canvas_new
+    canvas_color .= canvas_new
+    return nothing
 end
 
 """
@@ -166,7 +171,7 @@ Multiply a grayscale canvas by a color array to get a color canvas.
 function apply_color!(cam::Camera{F})::Nothing where {F}
     (; canvas_grayscale, color, canvas_color) = cam
     @threads for I in CartesianIndices(canvas_grayscale)
-        @. canvas_color[:, I] = canvas_grayscale[I] * color[:, I]
+        canvas_color[:, I] = @views(canvas_grayscale[I] .* color[:, I])
     end
     return nothing
 end

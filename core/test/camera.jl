@@ -53,16 +53,4 @@ end
     @test ray.loc ≈ Float32[0.6436098, 0.8657537, 0.15174258]
     @test norm(ray.dir) ≈ 1.0
     @test ray.dir ≈ Float32[0.2724516, -0.96194667, 0.020704657]
-
-    @test_throws "Pixel indices must fall inside screen res [100, 100], got (0, 68)." Rays.set_ray!(
-        ray,
-        camera,
-        (0, 68),
-    )
-
-    @test_throws "Pixel indices must fall inside screen res [100, 100], got (123, 68)." Rays.set_ray!(
-        ray,
-        camera,
-        (123, 68),
-    )
 end

@@ -11,7 +11,7 @@ warp!: A function which changes the origin of rays as they leave the camera
 
 dir, up and right are orthormal and completely fix the orientation of the camera.
 """
-struct Camera{F<:AbstractFloat}
+struct Camera{F<:AbstractFloat,W<:Function}
     loc::Vector{F}
     dir::Vector{F}
     up::Vector{F}
@@ -22,7 +22,7 @@ struct Camera{F<:AbstractFloat}
     canvas_grayscale::Array{F,2}
     color::Array{F,3}
     canvas_color::Array{F,3}
-    warp!::Function
+    warp!::W
     intersection_data_float::Dict{Symbol,Matrix{F}}
     intersection_data_int::Dict{Symbol,Matrix{Int}}
     function Camera(
@@ -36,11 +36,11 @@ struct Camera{F<:AbstractFloat}
         canvas_grayscale::Array{F,2},
         color::Array{F,3},
         canvas_color::Array{F,3},
-        warp!::Function,
+        warp!::W,
         intersection_data_float::Dict{Symbol,Matrix{F}},
         intersection_data_int::Dict{Symbol,Matrix{Int}},
-    ) where {F}
-        return new{F}(
+    ) where {F,W}
+        return new{F,W}(
             loc,
             dir,
             up,
@@ -230,10 +230,6 @@ function set_ray!(
     (; screen_dist, screen_size, screen_res, dir, loc, up, right, warp!) = camera
 
     screen_dist = screen_dist[1]
-
-    if !(all(pixel_indices .> 0) && all(pixel_indices .<= screen_res))
-        error("Pixel indices must fall inside screen res $screen_res, got $pixel_indices.")
-    end
 
     i, j = pixel_indices
     s_h, s_w = screen_size
