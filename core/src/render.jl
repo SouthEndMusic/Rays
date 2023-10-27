@@ -18,23 +18,30 @@ function shape_view!(
     shape = scene.shapes[shape_index]
     intersections = Intersection{F}[Intersection() for i = 1:nthreads()]
 
-    @threads for I in CartesianIndices(intersection_data_float[:t])
-        intersection = intersections[threadid()]
-        set_ray!(intersection.ray, camera, Tuple(I))
-        intersect!(intersection, shape)
+    n_chunks = 10 * nthreads()
+    CI = CartesianIndices(Tuple(camera.screen_res))
+    numel = prod(camera.screen_res)
 
-        # These are written out explicitly per variable
-        # because looping leads to runtime-dispatch
-        if :t in data_variables_float
-            intersection_data_float[:t][I] = intersection.t[1]
+    @threads for c in 1:n_chunks
+        for I_flat in c:n_chunks:numel
+            I = CI[I_flat]
+            intersection = intersections[threadid()]
+            set_ray!(intersection.ray, camera, Tuple(I))
+            intersect!(intersection, shape)
+
+            # These are written out explicitly per variable
+            # because looping leads to runtime-dispatch
+            if :t in data_variables_float
+                intersection_data_float[:t][I] = intersection.t[1]
+            end
+            if :dim in data_variables_int
+                intersection_data_int[:dim][I] = intersection.dim[1]
+            end
+            if :face in data_variables_int
+                intersection_data_int[:face][I] = intersection.face[1]
+            end
+            reset_intersection!(intersection)
         end
-        if :dim in data_variables_int
-            intersection_data_int[:dim][I] = intersection.dim[1]
-        end
-        if :face in data_variables_int
-            intersection_data_int[:face][I] = intersection.face[1]
-        end
-        reset_intersection!(intersection)
     end
 
     return nothing
@@ -116,22 +123,29 @@ function add_depth_of_field!(camera::Camera{F}, focus_curve::Function)::Nothing 
     t_int = intersection_data_float[:t]
     canvas_new = zeros(F, size(canvas_color)...)
 
-    @threads for I in CartesianIndices(t_int)
-        if isinf(t_int[I])
-            continue
-        end
-        focus = focus_curve(t_int[I])
-        kernel, Δi_max = get_blur_kernel(focus)
-        i, j = Tuple(I)
-        for Δi = -Δi_max:Δi_max
-            for Δj = -Δi_max:Δi_max
-                i_abs = i + Δi
-                j_abs = j + Δj
-                if (i_abs < 1) || (i_abs > w) || (j_abs < 1) || (j_abs > h)
-                    continue
+    n_chunks = 10 * nthreads()
+    CI = CartesianIndices(Tuple(camera.screen_res))
+    numel = prod(camera.screen_res)
+
+    @threads for c in 1:n_chunks
+        for I_flat in c:n_chunks:numel
+            I = CI[I_flat]
+            if isinf(t_int[I])
+                continue
+            end
+            focus = focus_curve(t_int[I])
+            kernel, Δi_max = get_blur_kernel(focus)
+            i, j = Tuple(I)
+            for Δi = -Δi_max:Δi_max
+                for Δj = -Δi_max:Δi_max
+                    i_abs = i + Δi
+                    j_abs = j + Δj
+                    if (i_abs < 1) || (i_abs > w) || (j_abs < 1) || (j_abs > h)
+                        continue
+                    end
+                    @. canvas_new[:, i_abs, j_abs] +=
+                        canvas_color[:, i, j] * kernel[Δi_max+Δi+1] * kernel[Δi_max+Δj+1]
                 end
-                @. canvas_new[:, i_abs, j_abs] +=
-                    canvas_color[:, i, j] * kernel[Δi_max+Δi+1] * kernel[Δi_max+Δj+1]
             end
         end
     end
@@ -147,19 +161,25 @@ metadata: a metadata value of n yields the nth color in color color_palette
 a metadata value of 0 yields no change in color
 """
 function get_color!(
-    cam::Camera{F},
+    camera::Camera{F},
     variable::Symbol,
     color_palette::AbstractMatrix{F},
 )::Nothing where {F}
-    (; color, intersection_data_int) = cam
+    (; color, intersection_data_int) = camera
     if variable ∉ keys(intersection_data_int)
         error("Integer intersection data of variable '$variable' has not been collected.")
     end
     data = intersection_data_int[variable]
-    @threads for I in CartesianIndices(data)
-        data_value = data[I]
-        if !iszero(data_value)
-            color[:, I] = view(color_palette, :, data_value)
+    n_chunks = 10 * nthreads()
+    CI = CartesianIndices(Tuple(camera.screen_res))
+    numel = prod(camera.screen_res)
+    @threads for c in 1:n_chunks
+        for I_flat in c:n_chunks:numel
+            I = CI[I_flat]
+            data_value = data[I]
+            if !iszero(data_value)
+                color[:, I] = view(color_palette, :, data_value)
+            end
         end
     end
     return nothing
@@ -168,10 +188,18 @@ end
 """
 Multiply a grayscale canvas by a color array to get a color canvas.
 """
-function apply_color!(cam::Camera{F})::Nothing where {F}
-    (; canvas_grayscale, color, canvas_color) = cam
-    @threads for I in CartesianIndices(canvas_grayscale)
-        canvas_color[:, I] = @views(canvas_grayscale[I] .* color[:, I])
+function apply_color!(camera::Camera{F})::Nothing where {F}
+    (; canvas_grayscale, color, canvas_color) = camera
+    n_chunks = 10 * nthreads()
+    CI = CartesianIndices(Tuple(camera.screen_res))
+    numel = prod(camera.screen_res)
+    @threads for c in 1:n_chunks
+        for I_flat in c:n_chunks:numel
+            I = CI[I_flat]
+            canvas_color[:, I] .= canvas_grayscale[I]
+            @views(canvas_color[:, I] .*= color[:, I])
+    
+        end
     end
     return nothing
 end
