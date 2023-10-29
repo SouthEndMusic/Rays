@@ -1,5 +1,5 @@
 """
-Struct for possibly multiple cameras. Per camera:
+name: the name of the camera
 loc: The location of the camera in space
 dir: The direction the camera is pointing in (vector of unit length)
 up: The upwards direction 
@@ -8,10 +8,13 @@ screen_size: The size of the screen in world units
 screen_dist: The distance between loc and the image plane
 screen_res: The resolution of the resulting render
 warp!: A function which changes the origin of rays as they leave the camera
+intersection_data_float: Dictionary variable name => float data Matrix
+intersection_data_int: Dictionary variable name => integer data Matrix
 
 dir, up and right are orthormal and completely fix the orientation of the camera.
 """
 struct Camera{F<:AbstractFloat,W<:Function}
+    name::Vector{Symbol}
     loc::Vector{F}
     dir::Vector{F}
     up::Vector{F}
@@ -26,6 +29,7 @@ struct Camera{F<:AbstractFloat,W<:Function}
     intersection_data_float::Dict{Symbol,Matrix{F}}
     intersection_data_int::Dict{Symbol,Matrix{Int}}
     function Camera(
+        name::Vector{Symbol},
         loc::Vector{F},
         dir::Vector{F},
         up::Vector{F},
@@ -41,6 +45,7 @@ struct Camera{F<:AbstractFloat,W<:Function}
         intersection_data_int::Dict{Symbol,Matrix{Int}},
     ) where {F,W}
         return new{F,W}(
+            name,
             loc,
             dir,
             up,
@@ -56,6 +61,12 @@ struct Camera{F<:AbstractFloat,W<:Function}
             intersection_data_int,
         )
     end
+end
+
+function Base.show(io::IO, camera::Camera)::Nothing
+    (; name) = camera
+    println(io, "<Camera '$(only(name))'>")
+    return nothing
 end
 
 const valid_intersection_data_variables_float = [:t]
@@ -94,6 +105,7 @@ function Camera(
     screen_res::Vector{Int};
     intersection_data_variables::Vector{Symbol} = [:t],
     warp!::Union{Function,Nothing} = nothing,
+    name::Union{Symbol,Nothing} = nothing,
 )::Camera where {F}
     right = cross(dir, up)
 
@@ -105,7 +117,14 @@ function Camera(
 
     intersection_data_float = Dict{Symbol,Matrix{F}}()
     intersection_data_int = Dict{Symbol,Matrix{Int}}()
+
+    # Generate default name if not given
+    if isnothing(name)
+        name = snake_case_name(Camera)
+    end
+
     camera = Camera(
+        [name],
         loc,
         dir,
         up,
@@ -136,11 +155,12 @@ function Camera(;
     screen_res::Vector{Int} = [100, 100],
     intersection_data_variables::Vector{Symbol} = [:t],
     float_type = Float32,
+    name::Union{Symbol,Nothing} = nothing,
 )::Camera
     default_values_float =
         Vector{float_type}[zeros(3), [1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.1, 0.1], [0.1]]
 
-    return Camera(default_values_float..., screen_res; intersection_data_variables)
+    return Camera(default_values_float..., screen_res; intersection_data_variables, name)
 end
 
 

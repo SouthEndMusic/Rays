@@ -17,3 +17,10 @@ function get_Δt!(dtimer::Dtimer{F})::F where {F}
     dtimer.t = t
     return Δt
 end
+
+function snake_case_name(T)::Symbol
+    name = String(Base.typename(T).name)
+    parts = eachmatch(r"[A-Z][a-z]*", name)
+    name_snake_case = join([part.match for part in parts], "_") |> lowercase
+    return Symbol(name_snake_case)
+end

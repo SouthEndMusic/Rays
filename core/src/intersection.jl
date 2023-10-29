@@ -18,6 +18,12 @@ function Base.convert(::Type{Intersection{F}}, intersection::Intersection) where
     )
 end
 
+# Intersection types only contain one value per field, but they are vectors to make them mutable.
+
+"""
+Get default values for the metadata of the intersection of
+a certain shape for when there is no intersection.
+"""
 function Intersection()::Intersection
     return Intersection(
         Ray(), # ray
