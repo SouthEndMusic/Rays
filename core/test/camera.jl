@@ -1,5 +1,4 @@
-using Test
-using Rays
+import Rays
 using LinearAlgebra: cross, norm
 
 @testset "Camera" begin
@@ -14,6 +13,7 @@ using LinearAlgebra: cross, norm
     @test camera isa Rays.Camera
     @test camera.right == cross(camera.dir, camera.up)
     @test camera.warp! == identity
+    @test string(camera) == "<Camera 'camera'>\n"
 end
 
 @testset "look at" begin

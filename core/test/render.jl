@@ -1,5 +1,4 @@
-using Test
-using Rays
+import Rays
 
 @testset "blur_kernel" begin
     kernel, Δi_max = Rays.get_blur_kernel(1.6)

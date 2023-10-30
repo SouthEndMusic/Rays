@@ -1,29 +1,34 @@
 """
-Create a Matrix{Float64} with intersection times of a shape per pixel.
+Fill a Matrix{Float64} with intersection times of a shape per pixel.
 If there is no intersection the intersection time is Inf.
 Depending on the type of object, metadata of the intersections can be collected,
 for instance the intersection dimension for cubes.
 """
 function shape_view!(
     scene::Scene{F};
-    camera_index::Int = 1,
-    shape_index::Int = 1,
+    name_camera::Union{Symbol,Nothing} = nothing,
 )::Nothing where {F}
 
-    camera = scene.cameras[camera_index]
+    if isnothing(name_camera)
+        camera = first(values(scene.cameras))
+    else
+        camera = scene.cameras[name_camera]
+    end
+
     (; intersection_data_float, intersection_data_int) = camera
     data_variables_float = keys(intersection_data_float)
     data_variables_int = keys(intersection_data_int)
 
-    shape = scene.shapes[shape_index]
+    # TODO: Refactor this function so that standard all shapes are viewed
+    shape = only(values(scene.shapes))
     intersections = Intersection{F}[Intersection() for i = 1:nthreads()]
 
     n_chunks = 10 * nthreads()
     CI = CartesianIndices(Tuple(camera.screen_res))
     numel = prod(camera.screen_res)
 
-    @threads for c in 1:n_chunks
-        for I_flat in c:n_chunks:numel
+    @threads for c = 1:n_chunks
+        for I_flat = c:n_chunks:numel
             I = CI[I_flat]
             intersection = intersections[threadid()]
             set_ray!(intersection.ray, camera, Tuple(I))
@@ -127,8 +132,8 @@ function add_depth_of_field!(camera::Camera{F}, focus_curve::Function)::Nothing 
     CI = CartesianIndices(Tuple(camera.screen_res))
     numel = prod(camera.screen_res)
 
-    @threads for c in 1:n_chunks
-        for I_flat in c:n_chunks:numel
+    @threads for c = 1:n_chunks
+        for I_flat = c:n_chunks:numel
             I = CI[I_flat]
             if isinf(t_int[I])
                 continue
@@ -173,8 +178,8 @@ function get_color!(
     n_chunks = 10 * nthreads()
     CI = CartesianIndices(Tuple(camera.screen_res))
     numel = prod(camera.screen_res)
-    @threads for c in 1:n_chunks
-        for I_flat in c:n_chunks:numel
+    @threads for c = 1:n_chunks
+        for I_flat = c:n_chunks:numel
             I = CI[I_flat]
             data_value = data[I]
             if !iszero(data_value)
@@ -193,12 +198,12 @@ function apply_color!(camera::Camera{F})::Nothing where {F}
     n_chunks = 10 * nthreads()
     CI = CartesianIndices(Tuple(camera.screen_res))
     numel = prod(camera.screen_res)
-    @threads for c in 1:n_chunks
-        for I_flat in c:n_chunks:numel
+    @threads for c = 1:n_chunks
+        for I_flat = c:n_chunks:numel
             I = CI[I_flat]
             canvas_color[:, I] .= canvas_grayscale[I]
             @views(canvas_color[:, I] .*= color[:, I])
-    
+
         end
     end
     return nothing
