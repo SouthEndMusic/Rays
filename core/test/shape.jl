@@ -1,5 +1,4 @@
-using Test
-using Rays
+import Rays
 using LinearAlgebra: normalize!
 
 @testset "Sphere" begin
@@ -7,6 +6,7 @@ using LinearAlgebra: normalize!
     R = 0.5
     sphere = Rays.Sphere(center, R)
     @test sphere isa Rays.Sphere
+    @test string(sphere) == "<Sphere 'sphere'>\n"
 
     intersection = Rays.Intersection()
     (; ray) = intersection
@@ -29,6 +29,9 @@ end
     R = 0.5
     cube = Rays.Cube(center, R)
     @test cube isa Rays.Cube
+
+    cube.name[1] = :my_awesome_cube
+    @test string(cube) == "<Cube 'my_awesome_cube'>\n"
 
     intersection = Rays.Intersection()
     (; ray) = intersection
