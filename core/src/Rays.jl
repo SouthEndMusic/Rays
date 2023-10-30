@@ -6,8 +6,6 @@ using FunctionWrappers
 import FunctionWrappers: FunctionWrapper
 
 using Base.Threads
-using Combinatorics: combinations
-using IterTools: product
 using LinearAlgebra: cross, normalize, normalize!, norm, dot, transpose!
 using SimpleDirectMediaLayer.LibSDL2
 

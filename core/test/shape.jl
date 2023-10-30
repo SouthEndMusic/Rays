@@ -6,7 +6,7 @@ using LinearAlgebra: normalize!
     R = 0.5
     sphere = Rays.Sphere(center, R)
     @test sphere isa Rays.Sphere
-    @test string(sphere) == "<Sphere 'sphere'>\n"
+    @test string(sphere) == "<Sphere 'sphere'>"
 
     intersection = Rays.Intersection()
     (; ray) = intersection
@@ -31,7 +31,7 @@ end
     @test cube isa Rays.Cube
 
     cube.name[1] = :my_awesome_cube
-    @test string(cube) == "<Cube 'my_awesome_cube'>\n"
+    @test string(cube) == "<Cube 'my_awesome_cube'>"
 
     intersection = Rays.Intersection()
     (; ray) = intersection
