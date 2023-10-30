@@ -12,7 +12,7 @@ Sphere(center::Vector{F}, R::F) where {F} =
 
 function Base.show(io::IO, sphere::Sphere)::Nothing
     (; name) = sphere
-    println(io, "<Sphere \'$(only(name))\'>")
+    print(io, "<Sphere \'$(only(name))\'>")
     return nothing
 end
 
@@ -26,7 +26,7 @@ Cube(center::Vector{F}, R::F) where {F} = Cube([snake_case_name(Cube)], center, 
 
 function Base.show(io::IO, cube::Cube)::Nothing
     (; name) = cube
-    println(io, "<Cube \'$(only(name))\'>")
+    print(io, "<Cube \'$(only(name))\'>")
     return nothing
 end
 
@@ -48,7 +48,7 @@ end
 
 function Base.show(io::IO, fractal_shape::FractalShape)::Nothing
     (; name, subshapes) = fractal_shape
-    println(
+    print(
         io,
         "<FractalShape \'$(only(name))\'; $(length(subshapes)) subshapes of type $(eltype(subshapes))>",
     )
@@ -68,7 +68,7 @@ function menger_sponge(
     R_subcube = convert(F, R_subcube)
     i = 0
 
-    for ordinals in product(1:3, 1:3, 1:3)
+    for ordinals in Iterators.product(1:3, 1:3, 1:3)
         i += 1
         ordinals = collect(ordinals)
         if count(x -> x == 2, ordinals) > 1
@@ -144,7 +144,7 @@ end
 
 function Base.show(io::IO, triangle_shape::TriangleShape)::Nothing
     (; name, n_vertices, n_faces) = triangle_shape
-    println(
+    print(
         io,
         "<TriangleShape \'$(only(name))\'; with $n_vertices vertices and $n_faces faces>",
     )
@@ -167,7 +167,7 @@ function Tetrahedron(center::Vector{F}, R::F)::TriangleShape{F} where {F}
         ]
     end
 
-    faces = collect(transpose(hcat(collect(combinations(1:4, 3))...)))
+    faces = [1 2 3; 1 2 4; 1 3 4; 2 3 4]
 
     return TriangleShape(vertices, faces, center; convex = true, name = :tetrahedron)
 end

@@ -65,7 +65,7 @@ end
 
 function Base.show(io::IO, camera::Camera)::Nothing
     (; name) = camera
-    println(io, "<Camera '$(only(name))'>")
+    print(io, "<Camera '$(only(name))'>")
     return nothing
 end
 
