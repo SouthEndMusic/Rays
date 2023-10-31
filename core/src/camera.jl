@@ -14,7 +14,7 @@ intersection_data_int: Dictionary variable name => integer data Matrix
 dir, up and right are orthormal and completely fix the orientation of the camera.
 """
 struct Camera{F<:AbstractFloat,W<:Function}
-    name::Vector{Symbol}
+    name::Symbol
     loc::Vector{F}
     dir::Vector{F}
     up::Vector{F}
@@ -29,7 +29,7 @@ struct Camera{F<:AbstractFloat,W<:Function}
     intersection_data_float::Dict{Symbol,Matrix{F}}
     intersection_data_int::Dict{Symbol,Matrix{Int}}
     function Camera(
-        name::Vector{Symbol},
+        name::Symbol,
         loc::Vector{F},
         dir::Vector{F},
         up::Vector{F},
@@ -65,7 +65,7 @@ end
 
 function Base.show(io::IO, camera::Camera)::Nothing
     (; name) = camera
-    print(io, "<Camera '$(only(name))'>")
+    print(io, "<Camera '$name'>")
     return nothing
 end
 
@@ -124,7 +124,7 @@ function Camera(
     end
 
     camera = Camera(
-        [name],
+        name,
         loc,
         dir,
         up,

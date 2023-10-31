@@ -44,11 +44,11 @@ end
 Add a camera to the scene.
 """
 function Base.push!(scene::Scene{F}, camera::Camera{F};)::Nothing where {F}
-    name = camera.name[1]
+    name = camera.name
     if name ∈ keys(scene.cameras) || name ∈ keys(scene.shapes)
         name_new = unique_name(name, scene)
+        camera = set_name(camera, name_new)
         @debug "name $name already used in scene, changed to $name_new."
-        camera.name[1] = name
         name = name_new
     end
     scene.cameras[name] = camera
@@ -59,11 +59,11 @@ end
 Add a shape to the scene.
 """
 function Base.push!(scene::Scene{F}, shape::Shape{F};)::Nothing where {F}
-    name = shape.name[1]
+    name = shape.name
     if name ∈ keys(scene.cameras) || name ∈ keys(scene.shapes)
         name_new = unique_name(name, scene)
+        shape = set_name(shape, name_new)
         @debug "name $name already used in scene, changed to $name_new."
-        shape.name[1] = name
         name = name_new
     end
     scene.shapes[name] = shape

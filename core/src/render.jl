@@ -208,3 +208,40 @@ function apply_color!(camera::Camera{F})::Nothing where {F}
     end
     return nothing
 end
+
+function render!(
+    scene::Scene{F};
+    name_camera::Union{Symbol,Nothing} = nothing,
+)::Nothing where {F}
+
+    # If no camera is specified, take the first one
+    if isnothing(name_camera)
+        camera = first(values(scene.cameras))
+    else
+        camera = scene.cameras[name_camera]
+    end
+
+    # Number of tasks
+    n_tasks = 10 * nthreads()
+
+    # All indices of the render
+    CI = CartesianIndices(Tuple(camera.screen_res))
+
+    # Number of pixels
+    n_pixels = prod(camera.screen_res)
+
+    # Intersection objects
+    intersections = Intersection{F}[Intersection() for i = 1:nthreads()]
+
+    @threads for task = 1:n_tasks
+        intersection = intersections[threadid()]
+        for I_flat = task:n_tasks:n_pixels
+            set_ray!(intersection.ray, camera, CI[I_flat].I)
+            for shape in scene.shapes
+                intersect!(intersection, shape)
+            end
+        end
+    end
+
+    return nothing
+end

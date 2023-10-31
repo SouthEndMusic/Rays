@@ -28,9 +28,10 @@ end
     center = [0.0, 2.0, 0.0]
     R = 0.5
     cube = Rays.Cube(center, R)
+    cube = Rays.set_name(cube, :my_awesome_cube)
+
     @test cube isa Rays.Cube
 
-    cube.name[1] = :my_awesome_cube
     @test string(cube) == "<Cube 'my_awesome_cube'>"
 
     intersection = Rays.Intersection()
