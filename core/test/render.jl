@@ -31,7 +31,7 @@ end
         push!(scene, shape)
         Rays.shape_view!(scene)
         Rays.cam_is_source!(camera)
-        delete!(scene.shapes, only(shape.name))
+        delete!(scene.shapes, shape.name)
         return nothing
     end
 
