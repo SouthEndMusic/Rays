@@ -56,11 +56,12 @@ function set_dropoff_curve_default!(scene::Scene{F}, camera::Camera{F})::Camera{
     if length(scene.shapes) == 0
         error("Cannot determine default dropoff curve without shapes in the scene.")
     end
-    dist_max = 0.0
+    dist_max = zero(F)
     for shape in values(scene.shapes)
         dist_max = max(dist_max, norm(camera.loc - shape.center))
     end
-    dropoff_curve = ScalarFunc{F}(t -> max(zero(F), one(F) - t / dist_max))
+    dropoff_curve =
+        ScalarFunc{F}(t -> max(zero(F), one(F) - t / (convert(F, 1.5) * dist_max)))
 
     fields = [
         name == :dropoff_curve ? dropoff_curve : getfield(camera, name) for
@@ -163,46 +164,20 @@ color_palette: (3, n_colors) array
 metadata: a metadata value of n yields the nth color in color color_palette
 a metadata value of 0 yields no change in color
 """
-function get_color!(
+function set_color!(
     camera::Camera{F},
     variable::Symbol,
+    intersection::Intersection{F},
     color_palette::AbstractMatrix{F},
+    pixel_indices::Tuple{Int,Int},
 )::Nothing where {F}
-    (; color, intersection_data_int) = camera
-    if variable ∉ keys(intersection_data_int)
-        error("Integer intersection data of variable '$variable' has not been collected.")
-    end
-    data = intersection_data_int[variable]
-    n_chunks = 10 * nthreads()
-    CI = CartesianIndices(Tuple(camera.screen_res))
-    numel = prod(camera.screen_res)
-    @threads for c ∈ 1:n_chunks
-        for I_flat ∈ c:n_chunks:numel
-            I = CI[I_flat]
-            data_value = data[I]
-            if !iszero(data_value)
-                color[:, I] = view(color_palette, :, data_value)
-            end
-        end
-    end
-    return nothing
-end
+    (; canvas) = camera
 
-"""
-Multiply a grayscale canvas by a color array to get a color canvas.
-"""
-function apply_color!(camera::Camera{F})::Nothing where {F}
-    (; canvas_grayscale, color, canvas_color) = camera
-    n_chunks = 10 * nthreads()
-    CI = CartesianIndices(Tuple(camera.screen_res))
-    numel = prod(camera.screen_res)
-    @threads for c ∈ 1:n_chunks
-        for I_flat ∈ c:n_chunks:numel
-            I = CI[I_flat]
-            canvas_color[:, I] .= canvas_grayscale[I]
-            @views(canvas_color[:, I] .*= color[:, I])
+    data_value = getfield(intersection, variable)[1]
+    name_intersected = intersection.name_intersected[1]
 
-        end
+    if name_intersected !== :none
+        canvas[:, pixel_indices...] .*= view(color_palette, :, data_value)
     end
     return nothing
 end
@@ -211,6 +186,8 @@ function render!(
     scene::Scene{F};
     name_camera::Union{Symbol,Nothing} = nothing,
     cam_is_source::Bool = true,
+    color_palette::Union{AbstractMatrix{F},Nothing} = nothing,
+    variable::Union{Symbol,Nothing} = nothing,
 )::Nothing where {F}
 
     # If no camera is specified, take the first one
@@ -251,6 +228,10 @@ function render!(
                     indices,
                 )
             end
+            if !isnothing(color_palette) && !isnothing(variable)
+                set_color!(camera, variable, intersection, color_palette, indices)
+            end
+            reset_intersection!(intersection)
         end
     end
 

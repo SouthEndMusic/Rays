@@ -193,7 +193,7 @@ end
 """
 Create a new instance of the same shape with a different name
 """
-function set_name(shape::S, name_new::Symbol)::S where {S<:Union{Shape,Camera}}
+function set_name(shape::S, name_new::Symbol)::S where {S<:Shape}
     fields = [name == :name ? name_new : getfield(shape, name) for name in fieldnames(S)]
     return S(fields...)
 end

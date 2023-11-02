@@ -62,6 +62,21 @@ function Base.show(io::IO, camera::Camera)::Nothing
     return nothing
 end
 
+function set_name(camera::Camera{F}, name_new::Symbol)::Camera{F} where {F}
+    fields = []
+    for name in fieldnames(Camera)
+        if name == :name
+            var = name_new
+        elseif name == :dropoff_curve
+            var = ScalarFunc{F}(camera.dropoff_curve)
+        else
+            var = getfield(camera, name)
+        end
+        push!(fields, var)
+    end
+    return Camera(fields...)
+end
+
 """
 Construct a camera object where the 'right' vector is computed using the cross product.
 """

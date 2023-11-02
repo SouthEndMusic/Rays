@@ -41,6 +41,7 @@ function Intersection()::Intersection
 end
 
 function reset_intersection!(intersection::Intersection)::Nothing
+    intersection.t[1] = Inf
     intersection.name_intersected[1] = :none
     return nothing
 end
