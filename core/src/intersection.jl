@@ -325,6 +325,9 @@ function intersect!(intersection::Intersection{F}, shape::TriangleShape{F};)::Bo
     return closer_intersection_found
 end
 
+"""
+Compute the gradient of a scalar field with finite differences.
+"""
 function ∇f_finitediff!(
     grad::Vector{F},
     loc::Vector{F},
