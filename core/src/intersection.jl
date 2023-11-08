@@ -1,3 +1,8 @@
+"""
+Object that holds all information of the intersection of a ray
+with a shape.
+Intersections should only contain one value per field, but they are vectors to make them mutable.
+"""
 struct Intersection{F<:AbstractFloat}
     ray::Ray{F}
     rays_transformed::Vector{Ray{F}}
@@ -10,6 +15,9 @@ struct Intersection{F<:AbstractFloat}
     diff::Vector{F}
     diff2::Vector{F}
     face::Vector{Int}
+    # For implicit surface intersections
+    loc_int::Vector{F}
+    grad::Vector{F}
 end
 
 function Base.convert(::Type{Intersection{F}}, intersection::Intersection) where {F}
@@ -17,8 +25,6 @@ function Base.convert(::Type{Intersection{F}}, intersection::Intersection) where
         [getfield(intersection, fieldname) for fieldname in fieldnames(Intersection)]...,
     )
 end
-
-# Intersection types only contain one value per field, but they are vectors to make them mutable.
 
 """
 Get default values for the metadata of the intersection of
@@ -35,21 +41,29 @@ function Intersection()::Intersection
         zeros(3), # diff
         zeros(3), # diff2
         [0], # face
+        zeros(3), # loc_int
+        zeros(3), # grad
     )
 end
 
+"""
+Set the intersection to a non-intersected state.
+"""
 function reset_intersection!(intersection::Intersection)::Nothing
     intersection.t[1] = Inf
     return nothing
 end
 
 """
-Compute the intersection of a ray with a sphere as the smallest
-real solution to a quadratic polynomial, if it exists.
+Compute the intersections of a ray with a sphere.
+Returns (nothing, nothing) if the intersections do not exist.
 """
-function intersect!(intersection::Intersection{F}, sphere::Sphere)::Bool where {F}
-    (; loc, dir) = intersection.ray
-    (; center, Rsq) = sphere
+function intersect_sphere(
+    ray::Ray{F},
+    center::Vector{F},
+    Rsq::F,
+)::Tuple{Union{F,Nothing},Union{F,Nothing}} where {F}
+    (; loc, dir) = ray
 
     diff = loc - center
     a = norm(dir)^2
@@ -57,10 +71,28 @@ function intersect!(intersection::Intersection{F}, sphere::Sphere)::Bool where {
     c = norm(diff)^2 - Rsq
     discr = b^2 - 4 * a * c
 
+    if discr >= 0
+        t_int_1 = (-b - sqrt(discr)) / (2 * a)
+        t_int_2 = (-b + sqrt(discr)) / (2 * a)
+        return t_int_1, t_int_2
+    else
+        return nothing, nothing
+    end
+end
+
+
+"""
+Compute the intersection of a ray with a sphere as the smallest
+real solution to a quadratic polynomial, if it exists.
+"""
+function intersect!(intersection::Intersection{F}, sphere::Sphere)::Bool where {F}
+    (; ray) = intersection
+    (; center, Rsq) = sphere
+    t_int_candidate = intersect_sphere(ray, center, Rsq)[1]
+
     closer_intersection_found = false
 
-    if discr >= 0
-        t_int_candidate = (-b - sqrt(discr)) / (2 * a)
+    if !isnothing(t_int_candidate)
         if t_int_candidate < intersection.t[1]
             closer_intersection_found = true
             intersection.t[1] = t_int_candidate
@@ -154,7 +186,7 @@ function intersect!(
     (; subshapes, depth, shrink_factor) = fractal_shape
 
     if current_depth == 1
-        for i = 1:depth
+        for i ∈ 1:depth
             if length(intersection.rays_transformed) < i
                 push!(intersection.rays_transformed, ray)
             end
@@ -291,4 +323,101 @@ function intersect!(intersection::Intersection{F}, shape::TriangleShape{F};)::Bo
     end
 
     return closer_intersection_found
+end
+
+"""
+Compute the gradient of a scalar field with finite differences.
+"""
+function ∇f_finitediff!(
+    grad::Vector{F},
+    loc::Vector{F},
+    f::ScalarField{F};
+    eps::AbstractFloat = 1e-4,
+) where {F}
+    for i ∈ 1:3
+        loc_perturbed = copy(loc)
+        loc_perturbed[i] += eps
+        grad[i] = (f(loc_perturbed) - f(loc)) / eps
+    end
+    return nothing
+end
+
+"""
+Compute the intersection between a ray and an implicit surface.
+"""
+function intersect!(
+    intersection::Intersection{F},
+    shape::ImplicitSurface{F},
+)::Bool where {F}
+    (; loc_int, ray, grad) = intersection
+    (; loc, dir) = ray
+    (; f, ∇f!, itermax, tol, center, R_bound, n_divisions) = shape
+
+    # Compute intersections of the ray with the bounding sphere
+    bound_lower, bound_upper = intersect_sphere(ray, center, R_bound^2)
+
+    # If there are no intersections with the bounding sphere,
+    # there are certainly no intersections with the implicit surface
+    if isnothing(bound_lower)
+        return false
+    end
+
+    # Compute the value of f at the closer bounding sphere intersection
+    loc_int .= view(dir, :)
+    loc_int .*= bound_lower
+    loc_int .+= view(loc, :)
+    fval_lower = f(loc_int)
+
+    # Find a sign change in f between the closer and further
+    # bounding sphere intersections starting from the closer
+    # and stepping with Δt
+    t_0 = zero(F)
+    Δt = (bound_upper - bound_lower) / n_divisions
+    found_t_0 = false
+    for i ∈ 1:n_divisions
+        t_0 = bound_lower + i * Δt
+        loc_int .= view(dir, :)
+        loc_int .*= t_0
+        loc_int .+= view(loc, :)
+        if fval_lower * f(loc_int) < zero(F)
+            found_t_0 = true
+            break
+        end
+    end
+
+    # If no sign change was found, conclude that 
+    # there is no intersection of this implicit surface
+    # with this ray
+    if !found_t_0
+        return false
+    end
+
+    # Find the zero of f along the ray with the desired
+    # tolerance using Newton iterations
+    t_n = t_0
+    for i ∈ 1:itermax
+        loc_int .= view(dir, :)
+        loc_int *= t_n
+        loc_int += view(loc, :)
+        fval = f(loc_int)
+        error = abs(fval)
+        if error < tol
+            if t_n < intersection.t[1]
+                intersection.t[1] = t_n
+                return true
+            else
+                return false
+            end
+        else
+            # If no analytical gradient of f is provided,
+            # compute a finite difference gradient.
+            if isnothing(∇f!)
+                ∇f_finitediff!(grad, loc_int, f)
+            else
+                ∇f!(grad, loc_int)
+            end
+            t_n -= fval / dot(grad, dir)
+        end
+    end
+    return false
 end

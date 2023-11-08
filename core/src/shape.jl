@@ -1,5 +1,8 @@
 abstract type Shape{F<:AbstractFloat} end
 
+const ScalarField = FunctionWrapper{F,Tuple{Vector{F}}} where {F}
+const VectorField = FunctionWrapper{Nothing,Tuple{Vector{F},Vector{F}}} where {F}
+
 struct Sphere{F} <: Shape{F}
     name::Vector{Symbol}
     center::Vector{F}
@@ -55,7 +58,7 @@ function Base.show(io::IO, fractal_shape::FractalShape)::Nothing
 end
 
 """
-Create a Menger sponge of given location, size and recursion depth,
+construct a Menger sponge of given location, size and recursion depth,
 with the subshapes array automatically generated.
 """
 function menger_sponge(
@@ -87,7 +90,7 @@ end
 A shape consisting of triangles.
 vertices: A n_vertices x 3 matrix of vertices
 faces: A n_faces x 3 matrix of faces. Each face is defined 
-    by the indices of 3 vertices.
+	by the indices of 3 vertices.
 center: The center of the shape
 n_vertices: The number of vertices
 n_faces: the number of faces
@@ -118,7 +121,7 @@ function TriangleShape(
     n_faces = size(faces)[1]
     normals = zeros(F, n_faces, 3)
 
-    @threads for i = 1:n_faces
+    @threads for i ∈ 1:n_faces
         u = vertices[faces[i, 1], :] - vertices[faces[i, 3], :]
         v = vertices[faces[i, 2], :] - vertices[faces[i, 3], :]
         n = cross(u, v)
@@ -173,7 +176,7 @@ function Tetrahedron(center::Vector{F}, R::F)::TriangleShape{F} where {F}
 end
 
 """
-Create a Sierpinski pyramid of given location, size and recursion depth,
+Construct a Sierpinski pyramid of given location, size and recursion depth,
 with the subshapes array automatically generated.
 """
 function sierpinski_pyramid(
@@ -185,7 +188,7 @@ function sierpinski_pyramid(
     R_subtetrahedron = convert(F, R / 2)
 
     tetrahedron_main = Tetrahedron(center, R)
-    for i = 1:4
+    for i ∈ 1:4
         subtetrahedron =
             Tetrahedron(center + tetrahedron_main.vertices[i, :] / 2, R_subtetrahedron)
         push!(subtetrahedra, subtetrahedron)
@@ -198,4 +201,97 @@ function sierpinski_pyramid(
         convert(F, 2.0),
         subtetrahedra,
     )
+end
+
+"""
+A shape defined as the level 0 set of the function
+	f: R^3 → R 
+which is a scalar field assumed to be C1 smooth.
+Note: the function f must change sign across the level 0 set
+to be detected propery.
+
+center: The center of the shape
+f: The scalar field function
+∇f!: The (in place) gradient function of f. If not provided,
+	finite difference gradients are used
+R_bound: The radius of the sphere around 'center' in which
+	the shape is assumed to be
+n_divisions: The amount of steps used between the 2 intersections
+	of the bounding sphere to find a sign change in f
+tol: The tolerance of approximating a zero of f:
+	|f| < tol 
+itermax: The maximum amount of Newton iterations used to find 
+	a zero of f along a ray within the specified tolerance
+"""
+struct ImplicitSurface{F,VF<:Union{VectorField{F},Nothing}} <: Shape{F}
+    name::Vector{Symbol}
+    center::Vector{F}
+    f::ScalarField{F}
+    ∇f!::VF
+    R_bound::F
+    n_divisions::Int
+    tol::F
+    itermax::Int
+end
+
+function Base.convert(
+    ::Type{ImplicitSurface{F,VF}},
+    implicit_surface::ImplicitSurface,
+) where {F,VF}
+    return ImplicitSurface{F,VF}(
+        [
+            getfield(implicit_surface, fieldname) for
+            fieldname in fieldnames(ImplicitSurface)
+        ]...,
+    )
+end
+
+"""
+Construct an Implicit surface with optional rootfinding
+parameters.
+"""
+function ImplicitSurface(
+    f::Function,
+    center::Vector{F};
+    ∇f!::Union{Function,Nothing} = nothing,
+    R_bound::Union{F,Nothing} = nothing,
+    name::Union{Symbol,Nothing} = nothing,
+    itermax::Int = 10,
+    n_divisions::Int = 3,
+    tol::Union{F,Nothing} = nothing,
+)::ImplicitSurface{F} where {F}
+    if isnothing(name)
+        name = snake_case_name(ImplicitSurface)
+    end
+    if isnothing(center)
+        center = zeros(F, 3)
+    end
+    if isnothing(R_bound)
+        R_bound = convert(F, 2.0)
+    end
+    if isnothing(tol)
+        tol = convert(F, 1e-3)
+    end
+
+    return ImplicitSurface(
+        [name],
+        center,
+        ScalarField{F}(f),
+        isnothing(∇f!) ? nothing : VectorField{F}(∇f!),
+        R_bound,
+        n_divisions,
+        tol,
+        itermax,
+    )
+end
+
+function Base.show(io::IO, implicit_surface::ImplicitSurface)::Nothing
+    (; name, f, ∇f!) = implicit_surface
+    gradient_descr =
+        isnothing(∇f!) ? "finite difference gradient" : "gradient \'$(∇f!.obj.x)\'"
+    print(
+        io,
+        "<ImplicitSurface \'$(only(name))\'; function \'$(f.obj.x)\' and $gradient_descr>",
+    )
+    return nothing
 end

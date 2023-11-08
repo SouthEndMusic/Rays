@@ -1,5 +1,7 @@
-import Rays
+using Test
+using Rays: Rays
 using LinearAlgebra: cross, norm
+
 
 @testset "Camera" begin
     loc = zeros(3)

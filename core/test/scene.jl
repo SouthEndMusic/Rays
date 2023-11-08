@@ -1,4 +1,5 @@
-import Rays
+using Test
+using Rays: Rays
 
 @testset "Scene string representation" begin
     scene = Rays.Scene()
