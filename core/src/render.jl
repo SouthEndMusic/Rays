@@ -63,11 +63,7 @@ function set_dropoff_curve_default!(scene::Scene{F}, camera::Camera{F})::Camera{
     dropoff_curve =
         ScalarFunc{F}(t -> max(zero(F), one(F) - t / (convert(F, 1.5) * dist_max)))
 
-    fields = [
-        name == :dropoff_curve ? dropoff_curve : getfield(camera, name) for
-        name in fieldnames(Camera)
-    ]
-    camera_new = Camera(fields...)
+    camera_new = @set camera.dropoff_curve = dropoff_curve
     scene.cameras[camera.name] = camera_new
     return camera_new
 end
@@ -119,12 +115,11 @@ The depth of field effect is created by applying a kernel to pixel to
 'smear out' its value over the neighbouring pixels, where the spread
 is given by the focus curve at the intersection time at that pixel.
 """
-function add_depth_of_field!(camera::Camera{F}, focus_curve::Function)::Nothing where {F}
+function add_depth_of_field!(camera::Camera{F})::Nothing where {F}
 
-    (; canvas_color, intersection_data_float) = camera
+    (; canvas, focus_curve) = camera
 
-    _, h, w = size(canvas_color)
-    t_int = intersection_data_float[:t]
+    _, h, w = size(canvas)
     canvas_new = zeros(F, size(canvas_color)...)
 
     n_chunks = 10 * nthreads()
@@ -147,14 +142,14 @@ function add_depth_of_field!(camera::Camera{F}, focus_curve::Function)::Nothing 
                     if (i_abs < 1) || (i_abs > w) || (j_abs < 1) || (j_abs > h)
                         continue
                     end
-                    @. canvas_new[:, i_abs, j_abs] +=
-                        canvas_color[:, i, j] * kernel[Δi_max+Δi+1] * kernel[Δi_max+Δj+1]
+                    @. canvas[:, i_abs, j_abs] +=
+                        canvas[:, i, j] * kernel[Δi_max+Δi+1] * kernel[Δi_max+Δj+1]
                 end
             end
         end
     end
 
-    canvas_color .= canvas_new
+    canvas .= canvas_new
     return nothing
 end
 
@@ -233,6 +228,10 @@ function render!(
             end
             reset_intersection!(intersection)
         end
+    end
+
+    if !isnothing(camera.focus_curve)
+        add_depth_of_field!(camera)
     end
 
     return nothing

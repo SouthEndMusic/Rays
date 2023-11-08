@@ -1,4 +1,5 @@
 const ScalarFunc = FunctionWrapper{F,Tuple{F}} where {F<:AbstractFloat}
+const Transform = FunctionWrapper{Nothing,Tuple{Vector{F}}} where {F<:AbstractFloat}
 
 """
 name: the name of the camera
@@ -10,12 +11,13 @@ screen_size: The size of the screen in world units
 screen_dist: The distance between loc and the image plane
 screen_res: The resolution of the resulting render
 warp!: A function which changes the origin of rays as they leave the camera
-dropoff_curve: Function [0,inf) -> [0,1] for the brightness dropoff with the distance to the camera
+dropoff_curve: Function [0,∞) → [0,1] for the brightness dropoff with the distance to the camera
 	when using cam_is_source!
+focus_curve: Function [0,∞) → R for the blurriness as function of the intersection t
 
 dir, up and right are orthormal and completely fix the orientation of the camera.
 """
-struct Camera{F<:AbstractFloat,W<:Function}
+struct Camera{F<:AbstractFloat,FC<:Union{ScalarFunc{F},Nothing}}
     name::Symbol
     loc::Vector{F}
     dir::Vector{F}
@@ -25,8 +27,9 @@ struct Camera{F<:AbstractFloat,W<:Function}
     screen_dist::Vector{F}
     screen_res::Vector{Int} # height, width
     canvas::Array{F,3}
-    warp!::W
-    dropoff_curve::FunctionWrapper{F,Tuple{F}}
+    warp!::Transform{F}
+    dropoff_curve::ScalarFunc{F}
+    focus_curve::FC
     function Camera(
         name::Symbol,
         loc::Vector{F},
@@ -37,10 +40,11 @@ struct Camera{F<:AbstractFloat,W<:Function}
         screen_dist::Vector{F},
         screen_res::Vector{Int},
         canvas::Array{F,3},
-        warp!::W,
-        dropoff_curve::FunctionWrapper{F,Tuple{F}},
-    ) where {F,W}
-        return new{F,W}(
+        warp!::Transform{F},
+        dropoff_curve::ScalarFunc{F},
+        focus_curve::FC,
+    ) where {F,FC}
+        return new{F,FC}(
             name,
             loc,
             dir,
@@ -52,6 +56,7 @@ struct Camera{F<:AbstractFloat,W<:Function}
             canvas,
             warp!,
             dropoff_curve,
+            focus_curve,
         )
     end
 end
@@ -62,19 +67,18 @@ function Base.show(io::IO, camera::Camera)::Nothing
     return nothing
 end
 
-function set_name(camera::Camera{F}, name_new::Symbol)::Camera{F} where {F}
-    fields = []
-    for name in fieldnames(Camera)
-        if name == :name
-            var = name_new
-        elseif name == :dropoff_curve
-            var = ScalarFunc{F}(camera.dropoff_curve)
-        else
-            var = getfield(camera, name)
-        end
-        push!(fields, var)
+"""
+Set the focus curve of a camera.
+Note: this is not a mutating function, it creates a new Camera instance.
+"""
+function set_focus_curve(
+    camera::Camera{F},
+    focus_curve::Union{Function,Nothing},
+)::Camera{F} where {F,FC}
+    if !isnothing(focus_curve)
+        focus_curve = ScalarFunc{F}(focus_curve)
     end
-    return Camera(fields...)
+    return @set camera.focus_curve = focus_curve
 end
 
 """
@@ -90,6 +94,7 @@ function Camera(
     warp!::Union{Function,Nothing} = nothing,
     name::Union{Symbol,Nothing} = nothing,
     dropoff_curve::Union{Function,Nothing} = nothing,
+    focus_curve::Union{Function,Nothing} = nothing,
 )::Camera where {F}
     right = cross(dir, up)
 
@@ -106,6 +111,10 @@ function Camera(
         dropoff_curve = ScalarFunc{F}(t -> convert(F, 1.0))
     end
 
+    if !isnothing(focus_curve)
+        focus_curve = ScalarFunc{F}(focus_curve)
+    end
+
     return Camera(
         name,
         loc,
@@ -116,8 +125,9 @@ function Camera(
         screen_dist,
         screen_res,
         canvas,
-        warp!,
-        dropoff_curve,
+        Transform{F}(warp!),
+        ScalarFunc{F}(dropoff_curve),
+        focus_curve,
     )
 end
 
