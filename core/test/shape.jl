@@ -1,4 +1,5 @@
-import Rays
+using Test
+using Rays: Rays
 using LinearAlgebra: normalize!
 
 @testset "Sphere" begin

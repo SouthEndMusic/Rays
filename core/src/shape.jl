@@ -1,5 +1,8 @@
 abstract type Shape{F<:AbstractFloat} end
 
+const ScalarField = FunctionWrapper{F,Tuple{Vector{F}}} where {F}
+const VectorField = FunctionWrapper{Nothing,Tuple{Vector{F},Vector{F}}} where {F}
+
 struct Sphere{F} <: Shape{F}
     name::Symbol
     center::Vector{F}
@@ -54,7 +57,7 @@ function Base.show(io::IO, fractal_shape::FractalShape)::Nothing
 end
 
 """
-Create a Menger sponge of given location, size and recursion depth,
+construct a Menger sponge of given location, size and recursion depth,
 with the subshapes array automatically generated.
 """
 function menger_sponge(
@@ -169,7 +172,7 @@ function Tetrahedron(center::Vector{F}, R::F)::TriangleShape{F} where {F}
 end
 
 """
-Create a Sierpinski pyramid of given location, size and recursion depth,
+Construct a Sierpinski pyramid of given location, size and recursion depth,
 with the subshapes array automatically generated.
 """
 function sierpinski_pyramid(
@@ -196,4 +199,97 @@ Create a new instance of the same shape with a different name
 function set_name(shape::S, name_new::Symbol)::S where {S<:Shape}
     fields = [name == :name ? name_new : getfield(shape, name) for name in fieldnames(S)]
     return S(fields...)
+end
+
+"""
+A shape defined as the level 0 set of the function
+	f: R^3 → R 
+which is a scalar field assumed to be C1 smooth.
+Note: the function f must change sign across the level 0 set
+to be detected propery.
+
+center: The center of the shape
+f: The scalar field function
+∇f!: The (in place) gradient function of f. If not provided,
+	finite difference gradients are used
+R_bound: The radius of the sphere around 'center' in which
+	the shape is assumed to be
+n_divisions: The amount of steps used between the 2 intersections
+	of the bounding sphere to find a sign change in f
+tol: The tolerance of approximating a zero of f:
+	|f| < tol 
+itermax: The maximum amount of Newton iterations used to find 
+	a zero of f along a ray within the specified tolerance
+"""
+struct ImplicitSurface{F,VF<:Union{VectorField{F},Nothing}} <: Shape{F}
+    name::Vector{Symbol}
+    center::Vector{F}
+    f::ScalarField{F}
+    ∇f!::VF
+    R_bound::F
+    n_divisions::Int
+    tol::F
+    itermax::Int
+end
+
+function Base.convert(
+    ::Type{ImplicitSurface{F,VF}},
+    implicit_surface::ImplicitSurface,
+) where {F,VF}
+    return ImplicitSurface{F,VF}(
+        [
+            getfield(implicit_surface, fieldname) for
+            fieldname in fieldnames(ImplicitSurface)
+        ]...,
+    )
+end
+
+"""
+Construct an Implicit surface with optional rootfinding
+parameters.
+"""
+function ImplicitSurface(
+    f::Function,
+    center::Vector{F};
+    ∇f!::Union{Function,Nothing} = nothing,
+    R_bound::Union{F,Nothing} = nothing,
+    name::Union{Symbol,Nothing} = nothing,
+    itermax::Int = 10,
+    n_divisions::Int = 3,
+    tol::Union{F,Nothing} = nothing,
+)::ImplicitSurface{F} where {F}
+    if isnothing(name)
+        name = snake_case_name(ImplicitSurface)
+    end
+    if isnothing(center)
+        center = zeros(F, 3)
+    end
+    if isnothing(R_bound)
+        R_bound = convert(F, 2.0)
+    end
+    if isnothing(tol)
+        tol = convert(F, 1e-3)
+    end
+
+    return ImplicitSurface(
+        [name],
+        center,
+        ScalarField{F}(f),
+        isnothing(∇f!) ? nothing : VectorField{F}(∇f!),
+        R_bound,
+        n_divisions,
+        tol,
+        itermax,
+    )
+end
+
+function Base.show(io::IO, implicit_surface::ImplicitSurface)::Nothing
+    (; name, f, ∇f!) = implicit_surface
+    gradient_descr =
+        isnothing(∇f!) ? "finite difference gradient" : "gradient \'$(∇f!.obj.x)\'"
+    print(
+        io,
+        "<ImplicitSurface \'$(only(name))\'; function \'$(f.obj.x)\' and $gradient_descr>",
+    )
+    return nothing
 end
