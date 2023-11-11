@@ -10,6 +10,8 @@ right: The right direction
 screen_size: The size of the screen in world units
 screen_dist: The distance between loc and the image plane
 screen_res: The resolution of the resulting render
+t_intersect: The intersection time per pixel
+canvas: The array to which the render is written
 warp!: A function which changes the origin of rays as they leave the camera
 dropoff_curve: Function [0,∞) → [0,1] for the brightness dropoff with the distance to the camera
 	when using cam_is_source!

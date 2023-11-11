@@ -1,3 +1,6 @@
+"""
+Object for holding the data of all cameras and shapes in a scene.
+"""
 struct Scene{F<:AbstractFloat}
     cameras::Dict{Symbol,Camera{F}}
     shapes_cube::Dict{Symbol,Cube{F}}
@@ -7,6 +10,9 @@ struct Scene{F<:AbstractFloat}
     shapes_triangle_shape::Dict{Symbol,TriangleShape{F}}
 end
 
+"""
+Check whether the given name already is a name of a camera or a shape.
+"""
 function name_exists(scene::Scene, name::Symbol)::Bool
     for fieldname in fieldnames(Scene)
         if name in keys(getfield(scene, fieldname))
@@ -16,6 +22,9 @@ function name_exists(scene::Scene, name::Symbol)::Bool
     return false
 end
 
+"""
+Get a vector of those fields of the scene object which are dictionaries of shapes.
+"""
 function get_shape_dicts(scene::Scene)::Vector{Dict}
     shape_dicts = Dict[]
     for fieldname in fieldnames(Rays.Scene)
@@ -27,6 +36,9 @@ function get_shape_dicts(scene::Scene)::Vector{Dict}
     return shape_dicts
 end
 
+"""
+Remove all shapes from the scene.
+"""
 function clear_shapes!(scene::Scene)::Nothing
     for shape_dicts in get_shape_dicts(scene)
         empty!(shape_dicts)

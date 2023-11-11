@@ -1,3 +1,11 @@
+"""
+Set the dropoff curve as:
+
+f(t) = max(0, 1 - t/(1.5*dist_max)) 
+
+where dist_max is the maximum distance between the camera location and
+the center of a shape.
+"""
 function set_dropoff_curve_default!(scene::Scene{F}, camera::Camera{F})::Camera{F} where {F}
     shape_dicts = get_shape_dicts(scene)
     if sum([length(shape_dict) for shape_dict in shape_dicts]) == 0
@@ -18,6 +26,9 @@ function set_dropoff_curve_default!(scene::Scene{F}, camera::Camera{F})::Camera{
     return camera_new
 end
 
+"""
+Apply the dropoff curve.
+"""
 function cam_is_source!(
     camera::Camera{F},
     t_intersect::F,
@@ -132,6 +143,9 @@ function set_color!(
     return nothing
 end
 
+"""
+The main loop over pixels voor rendering.
+"""
 function render!(
     scene::Scene{F};
     name_camera::Union{Symbol,Nothing} = nothing,
