@@ -1,88 +1,49 @@
 """
-Fill a Matrix{Float64} with intersection times of a shape per pixel.
-If there is no intersection the intersection time is Inf.
-Depending on the type of object, metadata of the intersections can be collected,
-for instance the intersection dimension for cubes.
+Set the dropoff curve as:
+
+f(t) = max(0, 1 - t/(1.5*dist_max)) 
+
+where dist_max is the maximum distance between the camera location and
+the center of a shape.
 """
-function shape_view!(
-    scene::Scene{F};
-    name_camera::Union{Symbol,Nothing} = nothing,
-)::Nothing where {F}
-
-    if isnothing(name_camera)
-        camera = first(values(scene.cameras))
-    else
-        camera = scene.cameras[name_camera]
+function set_dropoff_curve_default!(scene::Scene{F}, camera::Camera{F})::Camera{F} where {F}
+    shape_dicts = get_shape_dicts(scene)
+    if sum([length(shape_dict) for shape_dict in shape_dicts]) == 0
+        error("Cannot determine default dropoff curve without shapes in the scene.")
     end
+    dist_max = zero(F)
 
-    (; intersection_data_float, intersection_data_int) = camera
-    data_variables_float = keys(intersection_data_float)
-    data_variables_int = keys(intersection_data_int)
-
-    # TODO: Refactor this function so that standard all shapes are viewed
-    shape = only(values(scene.shapes))
-    intersections = Intersection{F}[Intersection() for i = 1:nthreads()]
-
-    n_chunks = 10 * nthreads()
-    CI = CartesianIndices(Tuple(camera.screen_res))
-    numel = prod(camera.screen_res)
-
-    @threads for c = 1:n_chunks
-        for I_flat = c:n_chunks:numel
-            I = CI[I_flat]
-            intersection = intersections[threadid()]
-            set_ray!(intersection.ray, camera, Tuple(I))
-            intersect!(intersection, shape)
-
-            # These are written out explicitly per variable
-            # because looping leads to runtime-dispatch
-            if :t in data_variables_float
-                intersection_data_float[:t][I] = intersection.t[1]
-            end
-            if :dim in data_variables_int
-                intersection_data_int[:dim][I] = intersection.dim[1]
-            end
-            if :face in data_variables_int
-                intersection_data_int[:face][I] = intersection.face[1]
-            end
-            reset_intersection!(intersection)
+    for shape_dict in shape_dicts
+        for shape in values(shape_dict)
+            dist_max = max(dist_max, norm(camera.loc - shape.center))
         end
     end
+    dropoff_curve =
+        ScalarFunc{F}(t -> max(zero(F), one(F) - t / (convert(F, 1.5) * dist_max)))
 
-    return nothing
+    camera_new = @set camera.dropoff_curve = dropoff_curve
+    scene.cameras[camera.name] = camera_new
+    return camera_new
 end
 
 """
-First create a grayscale canvas of the intersection times using the dropoff_curve;
-this curve which maps positive numbers to [0,1] determines the brightness of a pixel
-based on its distance to the camera. 
-If a color Array{Float64,3} is provided, this is multiplied by the grayscale canvas to
-produce a colored image with varying brightness.
+Apply the dropoff curve.
 """
 function cam_is_source!(
-    cam::Camera{F};
-    dropoff_curve::Union{Function,Nothing} = nothing,
+    camera::Camera{F},
+    t_intersect::F,
+    name_intersected::Symbol,
+    pixel_indices::Tuple{Int,Int},
 )::Nothing where {F}
-    (; canvas_grayscale, intersection_data_float) = cam
-    t_int = intersection_data_float[:t]
+    (; canvas, dropoff_curve) = camera
 
-    # Create a dropoff curve from the closest intersection to the
-    # furthest intersection fi no dropoff_curve is given
-    if isnothing(dropoff_curve)
-        Max = maximum(x -> isinf(x) ? -Inf : x, t_int)
-        Min = minimum(t_int)
-        Diff = Max - Min
-        curve(x) = 1 - (x - Min) / Diff
+    if name_intersected == :none
+        shade = zero(F)
     else
-        curve = dropoff_curve
+        shade = dropoff_curve(t_intersect)
     end
 
-    where_intersect = .!isinf.(t_int)
-    t_int_noninf = t_int[where_intersect]
-
-    canvas_grayscale .= 0.0
-    canvas_grayscale[where_intersect] = @. curve(t_int_noninf)
-
+    canvas[:, pixel_indices...] .= shade
     return nothing
 end
 
@@ -120,42 +81,41 @@ The depth of field effect is created by applying a kernel to pixel to
 'smear out' its value over the neighbouring pixels, where the spread
 is given by the focus curve at the intersection time at that pixel.
 """
-function add_depth_of_field!(camera::Camera{F}, focus_curve::Function)::Nothing where {F}
+function add_depth_of_field!(camera::Camera{F})::Nothing where {F}
 
-    (; canvas_color, intersection_data_float) = camera
+    (; canvas, t_intersect, focus_curve) = camera
 
-    _, h, w = size(canvas_color)
-    t_int = intersection_data_float[:t]
-    canvas_new = zeros(F, size(canvas_color)...)
+    _, h, w = size(canvas)
+    canvas_new = zeros(F, size(canvas)...)
 
     n_chunks = 10 * nthreads()
     CI = CartesianIndices(Tuple(camera.screen_res))
     numel = prod(camera.screen_res)
 
-    @threads for c = 1:n_chunks
-        for I_flat = c:n_chunks:numel
+    @threads for c ∈ 1:n_chunks
+        for I_flat ∈ c:n_chunks:numel
             I = CI[I_flat]
-            if isinf(t_int[I])
+            if isinf(t_intersect[I])
                 continue
             end
-            focus = focus_curve(t_int[I])
+            focus = focus_curve(t_intersect[I])
             kernel, Δi_max = get_blur_kernel(focus)
             i, j = Tuple(I)
-            for Δi = -Δi_max:Δi_max
-                for Δj = -Δi_max:Δi_max
+            for Δi ∈ -Δi_max:Δi_max
+                for Δj ∈ -Δi_max:Δi_max
                     i_abs = i + Δi
                     j_abs = j + Δj
                     if (i_abs < 1) || (i_abs > w) || (j_abs < 1) || (j_abs > h)
                         continue
                     end
                     @. canvas_new[:, i_abs, j_abs] +=
-                        canvas_color[:, i, j] * kernel[Δi_max+Δi+1] * kernel[Δi_max+Δj+1]
+                        canvas[:, i, j] * kernel[Δi_max+Δi+1] * kernel[Δi_max+Δj+1]
                 end
             end
         end
     end
 
-    canvas_color .= canvas_new
+    canvas .= canvas_new
     return nothing
 end
 
@@ -165,46 +125,101 @@ color_palette: (3, n_colors) array
 metadata: a metadata value of n yields the nth color in color color_palette
 a metadata value of 0 yields no change in color
 """
-function get_color!(
+function set_color!(
     camera::Camera{F},
     variable::Symbol,
+    intersection::Intersection{F},
     color_palette::AbstractMatrix{F},
+    pixel_indices::Tuple{Int,Int},
 )::Nothing where {F}
-    (; color, intersection_data_int) = camera
-    if variable ∉ keys(intersection_data_int)
-        error("Integer intersection data of variable '$variable' has not been collected.")
-    end
-    data = intersection_data_int[variable]
-    n_chunks = 10 * nthreads()
-    CI = CartesianIndices(Tuple(camera.screen_res))
-    numel = prod(camera.screen_res)
-    @threads for c = 1:n_chunks
-        for I_flat = c:n_chunks:numel
-            I = CI[I_flat]
-            data_value = data[I]
-            if !iszero(data_value)
-                color[:, I] = view(color_palette, :, data_value)
-            end
-        end
+    (; canvas) = camera
+
+    data_value::Int = getfield(intersection, variable)[1]
+    name_intersected = intersection.name_intersected[1]
+
+    if name_intersected !== :none
+        @views(canvas[:, pixel_indices...] .*= color_palette[:, data_value])
     end
     return nothing
 end
 
 """
-Multiply a grayscale canvas by a color array to get a color canvas.
+The main loop over pixels voor rendering.
 """
-function apply_color!(camera::Camera{F})::Nothing where {F}
-    (; canvas_grayscale, color, canvas_color) = camera
-    n_chunks = 10 * nthreads()
-    CI = CartesianIndices(Tuple(camera.screen_res))
-    numel = prod(camera.screen_res)
-    @threads for c = 1:n_chunks
-        for I_flat = c:n_chunks:numel
-            I = CI[I_flat]
-            canvas_color[:, I] .= canvas_grayscale[I]
-            @views(canvas_color[:, I] .*= color[:, I])
+function render!(
+    scene::Scene{F};
+    name_camera::Union{Symbol,Nothing} = nothing,
+    cam_is_source::Bool = true,
+    color_palette::Union{AbstractMatrix{F},Nothing} = nothing,
+    variable::Union{Symbol,Nothing} = nothing,
+)::Nothing where {F}
 
+    # If no camera is specified, take the first one
+    if isnothing(name_camera)
+        camera = first(values(scene.cameras))
+    else
+        camera = scene.cameras[name_camera]
+    end
+
+    (; canvas, t_intersect, screen_res, focus_curve) = camera
+
+    # Number of tasks
+    n_tasks = 10 * nthreads()
+
+    # All indices of the render
+    CI = CartesianIndices(Tuple(screen_res))
+
+    # Number of pixels
+    n_pixels = prod(screen_res)
+
+    # Intersection objects
+    intersections = Intersection{F}[Intersection() for i ∈ 1:nthreads()]
+
+    # Reset the canvas
+    canvas .= one(F)
+
+    @threads for task ∈ 1:n_tasks
+        intersection = intersections[threadid()]
+        for I_flat ∈ task:n_tasks:n_pixels
+            indices = CI[I_flat]
+            set_ray!(intersection.ray, camera, Tuple(indices))
+
+            for shape in values(scene.shapes_cube)
+                intersect_ray!(intersection, shape)
+            end
+            for shape in values(scene.shapes_fractal_shape)
+                intersect_ray!(intersection, shape)
+            end
+            for shape in values(scene.shapes_implicit_surface)
+                intersect_ray!(intersection, shape)
+            end
+            for shape in values(scene.shapes_sphere)
+                intersect_ray!(intersection, shape)
+            end
+            for shape in values(scene.shapes_triangle_shape)
+                intersect_ray!(intersection, shape)
+            end
+
+            t = intersection.t
+            view(t_intersect, [indices]) .= view(t, :)
+            if cam_is_source
+                cam_is_source!(
+                    camera,
+                    only(intersection.t),
+                    only(intersection.name_intersected),
+                    Tuple(indices),
+                )
+            end
+            if !isnothing(color_palette) && !isnothing(variable)
+                set_color!(camera, variable, intersection, color_palette, indices.I)
+            end
+            reset_intersection!(intersection)
         end
     end
+
+    if !isnothing(focus_curve)
+        add_depth_of_field!(camera)
+    end
+
     return nothing
 end

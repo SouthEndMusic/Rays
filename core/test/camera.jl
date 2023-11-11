@@ -14,7 +14,7 @@ using LinearAlgebra: cross, norm
 
     @test camera isa Rays.Camera
     @test camera.right == cross(camera.dir, camera.up)
-    @test camera.warp! == identity
+    @test camera.warp!.obj.x == identity
     @test string(camera) == "<Camera 'camera'>"
 end
 

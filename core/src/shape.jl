@@ -4,32 +4,31 @@ const ScalarField = FunctionWrapper{F,Tuple{Vector{F}}} where {F}
 const VectorField = FunctionWrapper{Nothing,Tuple{Vector{F},Vector{F}}} where {F}
 
 struct Sphere{F} <: Shape{F}
-    name::Vector{Symbol}
+    name::Symbol
     center::Vector{F}
     R::F
     Rsq::F
 end
 
-Sphere(center::Vector{F}, R::F) where {F} =
-    Sphere([snake_case_name(Sphere)], center, R, R^2)
+Sphere(center::Vector{F}, R::F) where {F} = Sphere(snake_case_name(Sphere), center, R, R^2)
 
 function Base.show(io::IO, sphere::Sphere)::Nothing
     (; name) = sphere
-    print(io, "<Sphere \'$(only(name))\'>")
+    print(io, "<Sphere \'$name\'>")
     return nothing
 end
 
 struct Cube{F} <: Shape{F}
-    name::Vector{Symbol}
+    name::Symbol
     center::Vector{F}
     R::F
 end
 
-Cube(center::Vector{F}, R::F) where {F} = Cube([snake_case_name(Cube)], center, R)
+Cube(center::Vector{F}, R::F) where {F} = Cube(snake_case_name(Cube), center, R)
 
 function Base.show(io::IO, cube::Cube)::Nothing
     (; name) = cube
-    print(io, "<Cube \'$(only(name))\'>")
+    print(io, "<Cube \'$name\'>")
     return nothing
 end
 
@@ -41,8 +40,8 @@ depth: the maximal recursion depth
 shrink_factor: the factor by which all lengths decrease for a substitution
 subshapes: the set of shapes that a shape is substituted with for a recursion step
 """
-struct FractalShape{F,S<:Shape} <: Shape{F}
-    name::Vector{Symbol}
+struct FractalShape{F,S<:Shape{F}} <: Shape{F}
+    name::Symbol
     center::Vector{F}
     depth::Int
     shrink_factor::F
@@ -53,7 +52,7 @@ function Base.show(io::IO, fractal_shape::FractalShape)::Nothing
     (; name, subshapes) = fractal_shape
     print(
         io,
-        "<FractalShape \'$(only(name))\'; $(length(subshapes)) subshapes of type $(eltype(subshapes))>",
+        "<FractalShape \'$name\'; $(length(subshapes)) subshapes of type $(eltype(subshapes))>",
     )
 end
 
@@ -80,10 +79,10 @@ function menger_sponge(
         center_subcube = @. center + (ordinals - 2) * 2 * R_subcube
         center_subcube = convert(Vector{F}, center_subcube)
 
-        subcube = Cube([Symbol("subcube_$i")], center_subcube, R_subcube)
+        subcube = Cube(Symbol("subcube_$i"), center_subcube, R_subcube)
         push!(subcubes, subcube)
     end
-    return FractalShape{F,Cube{F}}([:menger_sponge], center, depth, 3.0, subcubes)
+    return FractalShape{F,Cube{F}}(:menger_sponge, center, depth, 3.0, subcubes)
 end
 
 """
@@ -97,7 +96,7 @@ n_faces: the number of faces
 convex: Whether the triangles enclose a convex volume.
 """
 struct TriangleShape{F} <: Shape{F}
-    name::Vector{Symbol}
+    name::Symbol
     vertices::Matrix{F} # (n_vertices, 3)
     faces::Matrix{Int} # (n_faces, 3)
     normals::Matrix{F} # (n_faces, 3)
@@ -134,7 +133,7 @@ function TriangleShape(
     end
 
     return TriangleShape(
-        [name],
+        name,
         vertices,
         faces,
         normals,
@@ -147,10 +146,7 @@ end
 
 function Base.show(io::IO, triangle_shape::TriangleShape)::Nothing
     (; name, n_vertices, n_faces) = triangle_shape
-    print(
-        io,
-        "<TriangleShape \'$(only(name))\'; with $n_vertices vertices and $n_faces faces>",
-    )
+    print(io, "<TriangleShape \'$name\'; with $n_vertices vertices and $n_faces faces>")
     return nothing
 end
 
@@ -194,13 +190,15 @@ function sierpinski_pyramid(
         push!(subtetrahedra, subtetrahedron)
     end
 
-    return FractalShape(
-        [:sierpinski_pyramid],
-        center,
-        depth,
-        convert(F, 2.0),
-        subtetrahedra,
-    )
+    return FractalShape(:sierpinski_pyramid, center, depth, convert(F, 2.0), subtetrahedra)
+end
+
+"""
+Create a new instance of the same shape with a different name
+"""
+function set_name(shape::S, name_new::Symbol)::S where {S<:Shape}
+    fields = [name == :name ? name_new : getfield(shape, name) for name in fieldnames(S)]
+    return S(fields...)
 end
 
 """
@@ -224,7 +222,7 @@ itermax: The maximum amount of Newton iterations used to find
 	a zero of f along a ray within the specified tolerance
 """
 struct ImplicitSurface{F,VF<:Union{VectorField{F},Nothing}} <: Shape{F}
-    name::Vector{Symbol}
+    name::Symbol
     center::Vector{F}
     f::ScalarField{F}
     ∇f!::VF
@@ -274,7 +272,7 @@ function ImplicitSurface(
     end
 
     return ImplicitSurface(
-        [name],
+        name,
         center,
         ScalarField{F}(f),
         isnothing(∇f!) ? nothing : VectorField{F}(∇f!),
@@ -289,9 +287,6 @@ function Base.show(io::IO, implicit_surface::ImplicitSurface)::Nothing
     (; name, f, ∇f!) = implicit_surface
     gradient_descr =
         isnothing(∇f!) ? "finite difference gradient" : "gradient \'$(∇f!.obj.x)\'"
-    print(
-        io,
-        "<ImplicitSurface \'$(only(name))\'; function \'$(f.obj.x)\' and $gradient_descr>",
-    )
+    print(io, "<ImplicitSurface \'$name\'; function \'$(f.obj.x)\' and $gradient_descr>")
     return nothing
 end

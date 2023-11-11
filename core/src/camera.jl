@@ -1,3 +1,6 @@
+const ScalarFunc = FunctionWrapper{F,Tuple{F}} where {F<:AbstractFloat}
+const Transform = FunctionWrapper{Nothing,Tuple{Vector{F}}} where {F<:AbstractFloat}
+
 """
 name: the name of the camera
 loc: The location of the camera in space
@@ -7,14 +10,17 @@ right: The right direction
 screen_size: The size of the screen in world units
 screen_dist: The distance between loc and the image plane
 screen_res: The resolution of the resulting render
+t_intersect: The intersection time per pixel
+canvas: The array to which the render is written
 warp!: A function which changes the origin of rays as they leave the camera
-intersection_data_float: Dictionary variable name => float data Matrix
-intersection_data_int: Dictionary variable name => integer data Matrix
+dropoff_curve: Function [0,∞) → [0,1] for the brightness dropoff with the distance to the camera
+	when using cam_is_source!
+focus_curve: Function [0,∞) → R for the blurriness as function of the intersection t
 
 dir, up and right are orthormal and completely fix the orientation of the camera.
 """
-struct Camera{F<:AbstractFloat,W<:Function}
-    name::Vector{Symbol}
+struct Camera{F<:AbstractFloat,FC<:Union{ScalarFunc{F},Nothing}}
+    name::Symbol
     loc::Vector{F}
     dir::Vector{F}
     up::Vector{F}
@@ -22,75 +28,40 @@ struct Camera{F<:AbstractFloat,W<:Function}
     screen_size::Vector{F} # height, width
     screen_dist::Vector{F}
     screen_res::Vector{Int} # height, width
-    canvas_grayscale::Array{F,2}
-    color::Array{F,3}
-    canvas_color::Array{F,3}
-    warp!::W
-    intersection_data_float::Dict{Symbol,Matrix{F}}
-    intersection_data_int::Dict{Symbol,Matrix{Int}}
-    function Camera(
-        name::Vector{Symbol},
-        loc::Vector{F},
-        dir::Vector{F},
-        up::Vector{F},
-        right::Vector{F},
-        screen_size::Vector{F},
-        screen_dist::Vector{F},
-        screen_res::Vector{Int},
-        canvas_grayscale::Array{F,2},
-        color::Array{F,3},
-        canvas_color::Array{F,3},
-        warp!::W,
-        intersection_data_float::Dict{Symbol,Matrix{F}},
-        intersection_data_int::Dict{Symbol,Matrix{Int}},
-    ) where {F,W}
-        return new{F,W}(
-            name,
-            loc,
-            dir,
-            up,
-            right,
-            screen_size,
-            screen_dist,
-            screen_res,
-            canvas_grayscale,
-            color,
-            canvas_color,
-            warp!,
-            intersection_data_float,
-            intersection_data_int,
-        )
-    end
+    t_intersect::Matrix{F}
+    canvas::Array{F,3}
+    warp!::Transform{F}
+    dropoff_curve::ScalarFunc{F}
+    focus_curve::FC
 end
 
 function Base.show(io::IO, camera::Camera)::Nothing
     (; name) = camera
-    print(io, "<Camera '$(only(name))'>")
+    print(io, "<Camera '$name'>")
     return nothing
 end
 
-const valid_intersection_data_variables_float = [:t]
-const valid_intersection_data_variables_int = [:dim, :face]
-
-function add_intersection_data_variables!(
-    cam::Camera{F},
-    variables::Vector{Symbol},
-)::Nothing where {F}
-    (; intersection_data_float, intersection_data_int) = cam
-    for var in variables
-        if var in valid_intersection_data_variables_float
-            if var ∉ keys(intersection_data_float)
-                intersection_data_float[var] = zeros(F, cam.screen_res...)
-            end
-        elseif var in valid_intersection_data_variables_int
-            if var ∉ keys(intersection_data_int)
-                intersection_data_int[var] = zeros(Int, cam.screen_res...)
-            end
-        else
-            @warn "Encountered invalid intersection data variable '$var', skipped."
-        end
+"""
+Set the focus curve of a camera.
+Note: this is not a mutating function, it creates a new Camera instance.
+"""
+function set_focus_curve(
+    camera::Camera{F},
+    focus_curve::Union{Function,Nothing},
+)::Camera{F} where {F}
+    if !isnothing(focus_curve)
+        focus_curve = ScalarFunc{F}(focus_curve)
     end
-    return nothing
+    return @set camera.focus_curve = focus_curve
+end
+
+"""
+Set the warp! of a camera.
+Note: this is not a mutating function, it creates a new Camera instance.
+"""
+function set_warp(camera::Camera{F}, warp!::Function)::Camera{F} where {F}
+    warp! = Transform{F}(warp!)
+    return @set camera.warp! = warp!
 end
 
 """
@@ -103,28 +74,33 @@ function Camera(
     screen_size::Vector{F},
     screen_dist::Vector{F},
     screen_res::Vector{Int};
-    intersection_data_variables::Vector{Symbol} = [:t],
     warp!::Union{Function,Nothing} = nothing,
     name::Union{Symbol,Nothing} = nothing,
+    dropoff_curve::Union{Function,Nothing} = nothing,
+    focus_curve::Union{Function,Nothing} = nothing,
 )::Camera where {F}
     right = cross(dir, up)
 
     warp! = isnothing(warp!) ? identity : warp!
 
-    canvas_grayscale = zeros(F, screen_res...)
-    color = zeros(F, 3, screen_res...)
-    canvas_color = zeros(F, 3, screen_res...)
-
-    intersection_data_float = Dict{Symbol,Matrix{F}}()
-    intersection_data_int = Dict{Symbol,Matrix{Int}}()
+    canvas = zeros(F, 3, screen_res...)
+    t_intersect = zeros(F, screen_res...)
 
     # Generate default name if not given
     if isnothing(name)
         name = snake_case_name(Camera)
     end
 
-    camera = Camera(
-        [name],
+    if isnothing(dropoff_curve)
+        dropoff_curve = ScalarFunc{F}(t -> convert(F, 1.0))
+    end
+
+    if !isnothing(focus_curve)
+        focus_curve = ScalarFunc{F}(focus_curve)
+    end
+
+    return Camera(
+        name,
         loc,
         dir,
         up,
@@ -132,20 +108,12 @@ function Camera(
         screen_size,
         screen_dist,
         screen_res,
-        canvas_grayscale,
-        color,
-        canvas_color,
-        warp!,
-        intersection_data_float,
-        intersection_data_int,
+        t_intersect,
+        canvas,
+        Transform{F}(warp!),
+        ScalarFunc{F}(dropoff_curve),
+        focus_curve,
     )
-
-    if :t ∉ intersection_data_variables
-        push!(intersection_data_variables, :t)
-    end
-    add_intersection_data_variables!(camera, unique(intersection_data_variables))
-
-    return camera
 end
 
 """
@@ -153,14 +121,13 @@ Get a default camera instance
 """
 function Camera(;
     screen_res::Vector{Int} = [100, 100],
-    intersection_data_variables::Vector{Symbol} = [:t],
     float_type = Float32,
     name::Union{Symbol,Nothing} = nothing,
 )::Camera
     default_values_float =
         Vector{float_type}[zeros(3), [1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.1, 0.1], [0.1]]
 
-    return Camera(default_values_float..., screen_res; intersection_data_variables, name)
+    return Camera(default_values_float..., screen_res; name)
 end
 
 
