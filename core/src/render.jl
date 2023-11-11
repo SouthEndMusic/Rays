@@ -22,7 +22,12 @@ function cam_is_source!(
 )::Nothing where {F}
     (; canvas, dropoff_curve) = camera
 
-    shade = name_intersected == :none ? zero(F) : dropoff_curve(t_intersect)
+    if name_intersected == :none
+        shade = zero(F)
+    else
+        shade = dropoff_curve(t_intersect)
+    end
+
     canvas[:, pixel_indices...] .= shade
     return nothing
 end
@@ -118,7 +123,7 @@ function set_color!(
     name_intersected = intersection.name_intersected[1]
 
     if name_intersected !== :none
-        canvas[:, pixel_indices...] .*= view(color_palette, :, data_value)
+        @views(canvas[:, pixel_indices...] .*= color_palette[:, data_value])
     end
     return nothing
 end
@@ -156,22 +161,22 @@ function render!(
     @threads for task ∈ 1:n_tasks
         intersection = intersections[threadid()]
         for I_flat ∈ task:n_tasks:n_pixels
-            indices = CI[I_flat].I
-            set_ray!(intersection.ray, camera, indices)
+            indices = CI[I_flat]
+            set_ray!(intersection.ray, camera, Tuple(indices))
             for shape in values(scene.shapes)
                 intersect!(intersection, shape)
             end
-            camera.t_intersect[indices...] = only(intersection.t)
+            camera.t_intersect[indices] = only(intersection.t)
             if cam_is_source
                 cam_is_source!(
                     camera,
                     only(intersection.t),
                     only(intersection.name_intersected),
-                    indices,
+                    Tuple(indices),
                 )
             end
             if !isnothing(color_palette) && !isnothing(variable)
-                set_color!(camera, variable, intersection, color_palette, indices)
+                set_color!(camera, variable, intersection, color_palette, indices.I)
             end
             reset_intersection!(intersection)
         end
