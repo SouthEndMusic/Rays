@@ -40,7 +40,7 @@ depth: the maximal recursion depth
 shrink_factor: the factor by which all lengths decrease for a substitution
 subshapes: the set of shapes that a shape is substituted with for a recursion step
 """
-struct FractalShape{F,S<:Shape} <: Shape{F}
+struct FractalShape{F,S<:Shape{F}} <: Shape{F}
     name::Symbol
     center::Vector{F}
     depth::Int

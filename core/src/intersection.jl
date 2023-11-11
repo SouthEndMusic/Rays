@@ -61,8 +61,8 @@ end
 If a closer intersection was found, set the name of the intersected shape
 in the intersection data.
 """
-function intersect!(intersection::Intersection{F}, shape::Shape{F})::Nothing where {F}
-    if _intersect!(intersection, shape)
+function intersect_ray!(intersection::Intersection{F}, shape::Shape{F})::Nothing where {F}
+    if _intersect_ray!(intersection, shape)
         intersection.name_intersected[1] = shape.name
     end
     return nothing
@@ -99,7 +99,7 @@ end
 Compute the intersection of a ray with a sphere as the smallest
 real solution to a quadratic polynomial, if it exists.
 """
-function _intersect!(intersection::Intersection{F}, sphere::Sphere)::Bool where {F}
+function _intersect_ray!(intersection::Intersection{F}, sphere::Sphere)::Bool where {F}
     (; ray) = intersection
     (; center, Rsq) = sphere
     t_int_candidate = intersect_sphere(ray, center, Rsq)[1]
@@ -120,7 +120,7 @@ end
 Compute the intersection of a ray with a cube by computing the intersections
 with each of the 6 face planes and then checking whether the intersection is within the face.
 """
-function _intersect!(intersection::Intersection{F}, cube::Cube{F})::Bool where {F}
+function _intersect_ray!(intersection::Intersection{F}, cube::Cube{F})::Bool where {F}
     (; ray) = intersection
 
     closer_intersection_found = false
@@ -191,11 +191,11 @@ Compute the intersection of a ray with a fractal shape.
 This is done recursively until the recursion depth of the fractal shape.
 To compute the intersection of a ray with a subshape, the ray location is transformed.
 """
-function _intersect!(
+function _intersect_ray!(
     intersection::Intersection{F},
-    fractal_shape::FractalShape{F};
+    fractal_shape::FractalShape{F,S};
     current_depth::Int = 1,
-)::Bool where {F}
+)::Bool where {F,S}
     (; ray) = intersection
     (; subshapes, depth, shrink_factor) = fractal_shape
 
@@ -211,7 +211,7 @@ function _intersect!(
     subshape_intersect = nothing
 
     for subshape in subshapes
-        closer_intersection_found = _intersect!(intersection, subshape)
+        closer_intersection_found = _intersect_ray!(intersection, subshape)
 
         if closer_intersection_found
             subshape_intersect = subshape
@@ -230,8 +230,11 @@ function _intersect!(
             ray_transformed.loc .*= shrink_factor
 
             intersection.t[1] *= shrink_factor
-            closer_intersection_found =
-                _intersect!(intersection, fractal_shape, current_depth = current_depth + 1)
+            closer_intersection_found = _intersect_ray!(
+                intersection,
+                fractal_shape,
+                current_depth = current_depth + 1,
+            )
             intersection.t[1] /= shrink_factor
         else
             closer_intersection_found = true
@@ -245,7 +248,7 @@ end
 Compute the intersection of a ray with a triangle given by
 the triangle vertices.
 """
-function _intersect!(
+function _intersect_ray!(
     intersection::Intersection{F},
     triangle_vertices::AbstractArray{F};
     normal::Union{AbstractVector{F},Nothing} = nothing,
@@ -319,7 +322,7 @@ end
 Compute the intersection of a ray with a triangle shape
 as the smallest intersection time over all triangles.
 """
-function _intersect!(
+function _intersect_ray!(
     intersection::Intersection{F},
     shape::TriangleShape{F};
 )::Bool where {F}
@@ -330,7 +333,7 @@ function _intersect!(
     for i ∈ 1:shape.n_faces
         triangle_vertices = view(vertices, view(faces, i, :), :)
         normal = view(normals, i, :)
-        t_int_candidate = _intersect!(
+        t_int_candidate = _intersect_ray!(
             intersection,
             triangle_vertices;
             normal,
@@ -366,7 +369,7 @@ end
 """
 Compute the intersection between a ray and an implicit surface.
 """
-function _intersect!(
+function _intersect_ray!(
     intersection::Intersection{F},
     shape::ImplicitSurface{F},
 )::Bool where {F}

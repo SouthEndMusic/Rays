@@ -1,10 +1,14 @@
 function set_dropoff_curve_default!(scene::Scene{F}, camera::Camera{F})::Camera{F} where {F}
-    if length(scene.shapes) == 0
+    shape_dicts = get_shape_dicts(scene)
+    if sum([length(shape_dict) for shape_dict in shape_dicts]) == 0
         error("Cannot determine default dropoff curve without shapes in the scene.")
     end
     dist_max = zero(F)
-    for shape in values(scene.shapes)
-        dist_max = max(dist_max, norm(camera.loc - shape.center))
+
+    for shape_dict in shape_dicts
+        for shape in values(shape_dict)
+            dist_max = max(dist_max, norm(camera.loc - shape.center))
+        end
     end
     dropoff_curve =
         ScalarFunc{F}(t -> max(zero(F), one(F) - t / (convert(F, 1.5) * dist_max)))
@@ -119,7 +123,7 @@ function set_color!(
 )::Nothing where {F}
     (; canvas) = camera
 
-    data_value = getfield(intersection, variable)[1]
+    data_value::Int = getfield(intersection, variable)[1]
     name_intersected = intersection.name_intersected[1]
 
     if name_intersected !== :none
@@ -143,30 +147,47 @@ function render!(
         camera = scene.cameras[name_camera]
     end
 
+    (; canvas, t_intersect, screen_res, focus_curve) = camera
+
     # Number of tasks
     n_tasks = 10 * nthreads()
 
     # All indices of the render
-    CI = CartesianIndices(Tuple(camera.screen_res))
+    CI = CartesianIndices(Tuple(screen_res))
 
     # Number of pixels
-    n_pixels = prod(camera.screen_res)
+    n_pixels = prod(screen_res)
 
     # Intersection objects
     intersections = Intersection{F}[Intersection() for i ∈ 1:nthreads()]
 
     # Reset the canvas
-    camera.canvas .= one(F)
+    canvas .= one(F)
 
     @threads for task ∈ 1:n_tasks
         intersection = intersections[threadid()]
         for I_flat ∈ task:n_tasks:n_pixels
             indices = CI[I_flat]
             set_ray!(intersection.ray, camera, Tuple(indices))
-            for shape in values(scene.shapes)
-                intersect!(intersection, shape)
+
+            for shape in values(scene.shapes_cube)
+                intersect_ray!(intersection, shape)
             end
-            camera.t_intersect[indices] = only(intersection.t)
+            for shape in values(scene.shapes_fractal_shape)
+                intersect_ray!(intersection, shape)
+            end
+            for shape in values(scene.shapes_implicit_surface)
+                intersect_ray!(intersection, shape)
+            end
+            for shape in values(scene.shapes_sphere)
+                intersect_ray!(intersection, shape)
+            end
+            for shape in values(scene.shapes_triangle_shape)
+                intersect_ray!(intersection, shape)
+            end
+
+            t = intersection.t
+            view(t_intersect, [indices]) .= view(t, :)
             if cam_is_source
                 cam_is_source!(
                     camera,
@@ -182,7 +203,7 @@ function render!(
         end
     end
 
-    if !isnothing(camera.focus_curve)
+    if !isnothing(focus_curve)
         add_depth_of_field!(camera)
     end
 

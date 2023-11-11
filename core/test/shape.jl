@@ -15,13 +15,13 @@ using LinearAlgebra: normalize!
     ray.loc .= 0.0
     ray.dir .= 1.0
     normalize!(ray.dir)
-    closer_intersection_found = Rays._intersect!(intersection, sphere)
+    closer_intersection_found = Rays._intersect_ray!(intersection, sphere)
     @test closer_intersection_found
     @test intersection.t[1] ≈ sqrt(3) - 0.5
 
     Rays.reset_intersection!(intersection)
     ray.dir .= [0.0, 0.0, 1.0]
-    closer_intersection_found = Rays._intersect!(intersection, sphere)
+    closer_intersection_found = Rays._intersect_ray!(intersection, sphere)
     @test !closer_intersection_found
     @test intersection.t[1] == Inf
 end
@@ -42,7 +42,7 @@ end
     ray.dir .= [0.0, 1.0, 0.0]
     normalize!(ray.dir)
 
-    closer_intersection_found = Rays._intersect!(intersection, cube)
+    closer_intersection_found = Rays._intersect_ray!(intersection, cube)
     @test closer_intersection_found
     @test intersection.t[1] ≈ 1.5
     @test intersection.dim[1] == 2

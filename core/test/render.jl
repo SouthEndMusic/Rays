@@ -51,7 +51,7 @@ end
     Rays.set_dropoff_curve_default!(scene, camera)
 
     function simple_view!(shape)
-        delete!(scene.shapes, only(keys(scene.shapes)))
+        Rays.clear_shapes!(scene)
         push!(scene, shape)
         Rays.render!(scene)
         return nothing
