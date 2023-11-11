@@ -62,12 +62,11 @@ such that the new name does not exist yet in the scene.
 function unique_name(name_old::Symbol, scene::Scene)::Symbol
     name_base = string(name_old) * "_"
     names_camera = keys(scene.cameras)
-    names_shapes = keys(scene.shapes)
     i = 0
     while true
         i += 1
         name = Symbol(name_base * string(i))
-        if name ∉ names_camera && name ∉ names_shapes
+        if !name_exists(scene, name)
             return name
         end
     end
