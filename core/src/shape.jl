@@ -222,7 +222,7 @@ itermax: The maximum amount of Newton iterations used to find
 	a zero of f along a ray within the specified tolerance
 """
 struct ImplicitSurface{F,VF<:Union{VectorField{F},Nothing}} <: Shape{F}
-    name::Vector{Symbol}
+    name::Symbol
     center::Vector{F}
     f::ScalarField{F}
     ∇f!::VF
@@ -272,7 +272,7 @@ function ImplicitSurface(
     end
 
     return ImplicitSurface(
-        [name],
+        name,
         center,
         ScalarField{F}(f),
         isnothing(∇f!) ? nothing : VectorField{F}(∇f!),
@@ -287,9 +287,6 @@ function Base.show(io::IO, implicit_surface::ImplicitSurface)::Nothing
     (; name, f, ∇f!) = implicit_surface
     gradient_descr =
         isnothing(∇f!) ? "finite difference gradient" : "gradient \'$(∇f!.obj.x)\'"
-    print(
-        io,
-        "<ImplicitSurface \'$(only(name))\'; function \'$(f.obj.x)\' and $gradient_descr>",
-    )
+    print(io, "<ImplicitSurface \'$name\'; function \'$(f.obj.x)\' and $gradient_descr>")
     return nothing
 end

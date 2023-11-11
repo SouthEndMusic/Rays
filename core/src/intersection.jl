@@ -99,7 +99,7 @@ end
 Compute the intersection of a ray with a sphere as the smallest
 real solution to a quadratic polynomial, if it exists.
 """
-function intersect!(intersection::Intersection{F}, sphere::Sphere)::Bool where {F}
+function _intersect!(intersection::Intersection{F}, sphere::Sphere)::Bool where {F}
     (; ray) = intersection
     (; center, Rsq) = sphere
     t_int_candidate = intersect_sphere(ray, center, Rsq)[1]
@@ -218,20 +218,24 @@ function _intersect!(
         end
     end
 
-    if !isnothing(subshape_intersect) && current_depth < depth
-        reset_intersection!(intersection)
-        ray_transformed = intersection.rays_transformed[current_depth+1]
-        ray_transformed.loc .= ray.loc
-        ray_transformed.loc .+= fractal_shape.center
-        ray_transformed.loc .-= subshape_intersect.center
-        ray_transformed.loc .*= shrink_factor
-
-        intersection.t[1] *= shrink_factor
-        closer_intersection_found =
-            _intersect!(intersection, fractal_shape, current_depth = current_depth + 1)
-        intersection.t[1] /= shrink_factor
-    else
+    if isnothing(subshape_intersect)
         closer_intersection_found = false
+    else
+        if current_depth < depth
+            reset_intersection!(intersection)
+            ray_transformed = intersection.rays_transformed[current_depth+1]
+            ray_transformed.loc .= ray.loc
+            ray_transformed.loc .+= fractal_shape.center
+            ray_transformed.loc .-= subshape_intersect.center
+            ray_transformed.loc .*= shrink_factor
+
+            intersection.t[1] *= shrink_factor
+            closer_intersection_found =
+                _intersect!(intersection, fractal_shape, current_depth = current_depth + 1)
+            intersection.t[1] /= shrink_factor
+        else
+            closer_intersection_found = true
+        end
     end
 
     return closer_intersection_found
@@ -362,7 +366,7 @@ end
 """
 Compute the intersection between a ray and an implicit surface.
 """
-function intersect!(
+function _intersect!(
     intersection::Intersection{F},
     shape::ImplicitSurface{F},
 )::Bool where {F}

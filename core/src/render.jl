@@ -1,57 +1,3 @@
-"""
-Fill a Matrix{Float64} with intersection times of a shape per pixel.
-If there is no intersection the intersection time is Inf.
-Depending on the type of object, metadata of the intersections can be collected,
-for instance the intersection dimension for cubes.
-"""
-function shape_view!(
-    scene::Scene{F};
-    name_camera::Union{Symbol,Nothing} = nothing,
-)::Nothing where {F}
-
-    if isnothing(name_camera)
-        camera = first(values(scene.cameras))
-    else
-        camera = scene.cameras[name_camera]
-    end
-
-    (; intersection_data_float, intersection_data_int) = camera
-    data_variables_float = keys(intersection_data_float)
-    data_variables_int = keys(intersection_data_int)
-
-    # TODO: Refactor this function so that standard all shapes are viewed
-    shape = only(values(scene.shapes))
-    intersections = Intersection{F}[Intersection() for i ∈ 1:nthreads()]
-
-    n_chunks = 10 * nthreads()
-    CI = CartesianIndices(Tuple(camera.screen_res))
-    numel = prod(camera.screen_res)
-
-    @threads for c ∈ 1:n_chunks
-        for I_flat ∈ c:n_chunks:numel
-            I = CI[I_flat]
-            intersection = intersections[threadid()]
-            set_ray!(intersection.ray, camera, Tuple(I))
-            intersect!(intersection, shape)
-
-            # These are written out explicitly per variable
-            # because looping leads to runtime-dispatch
-            if :t in data_variables_float
-                intersection_data_float[:t][I] = intersection.t[1]
-            end
-            if :dim in data_variables_int
-                intersection_data_int[:dim][I] = intersection.dim[1]
-            end
-            if :face in data_variables_int
-                intersection_data_int[:face][I] = intersection.face[1]
-            end
-            reset_intersection!(intersection)
-        end
-    end
-
-    return nothing
-end
-
 function set_dropoff_curve_default!(scene::Scene{F}, camera::Camera{F})::Camera{F} where {F}
     if length(scene.shapes) == 0
         error("Cannot determine default dropoff curve without shapes in the scene.")
@@ -117,10 +63,10 @@ is given by the focus curve at the intersection time at that pixel.
 """
 function add_depth_of_field!(camera::Camera{F})::Nothing where {F}
 
-    (; canvas, focus_curve) = camera
+    (; canvas, t_intersect, focus_curve) = camera
 
     _, h, w = size(canvas)
-    canvas_new = zeros(F, size(canvas_color)...)
+    canvas_new = zeros(F, size(canvas)...)
 
     n_chunks = 10 * nthreads()
     CI = CartesianIndices(Tuple(camera.screen_res))
@@ -129,10 +75,10 @@ function add_depth_of_field!(camera::Camera{F})::Nothing where {F}
     @threads for c ∈ 1:n_chunks
         for I_flat ∈ c:n_chunks:numel
             I = CI[I_flat]
-            if isinf(t_int[I])
+            if isinf(t_intersect[I])
                 continue
             end
-            focus = focus_curve(t_int[I])
+            focus = focus_curve(t_intersect[I])
             kernel, Δi_max = get_blur_kernel(focus)
             i, j = Tuple(I)
             for Δi ∈ -Δi_max:Δi_max
@@ -142,7 +88,7 @@ function add_depth_of_field!(camera::Camera{F})::Nothing where {F}
                     if (i_abs < 1) || (i_abs > w) || (j_abs < 1) || (j_abs > h)
                         continue
                     end
-                    @. canvas[:, i_abs, j_abs] +=
+                    @. canvas_new[:, i_abs, j_abs] +=
                         canvas[:, i, j] * kernel[Δi_max+Δi+1] * kernel[Δi_max+Δj+1]
                 end
             end
@@ -215,6 +161,7 @@ function render!(
             for shape in values(scene.shapes)
                 intersect!(intersection, shape)
             end
+            camera.t_intersect[indices...] = only(intersection.t)
             if cam_is_source
                 cam_is_source!(
                     camera,
