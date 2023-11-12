@@ -1,6 +1,3 @@
-const ScalarFunc = FunctionWrapper{F,Tuple{F}} where {F<:AbstractFloat}
-const Transform = FunctionWrapper{Nothing,Tuple{Vector{F}}} where {F<:AbstractFloat}
-
 """
 name: the name of the camera
 loc: The location of the camera in space
