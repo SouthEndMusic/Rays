@@ -1,8 +1,7 @@
 # Rays
 3D graphics in Julia using raycasting.
 
-![download](https://github.com/SouthEndMusic/Rays/assets/74617371/7a85dfc0-58b8-4602-9e4a-21e1a86f7fb3)
-
+![Multiple_shapes_example](https://github.com/SouthEndMusic/Rays/assets/74617371/80355f6f-de56-40ff-b75f-891649d348ab)
 
 ## Examples
 
