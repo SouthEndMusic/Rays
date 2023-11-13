@@ -290,3 +290,26 @@ function Base.show(io::IO, implicit_surface::ImplicitSurface)::Nothing
     print(io, "<ImplicitSurface \'$name\'; function \'$(f.obj.x)\' and $gradient_descr>")
     return nothing
 end
+
+struct RevolutionSurface{F} <: Shape{F}
+    name::Symbol
+    center::Vector{F}
+    r::ScalarFunc{F}
+    r_max::F
+    z_min::F
+    z_max::F
+end
+
+function RevolutionSurface(
+    r::Function,
+    r_max::F,
+    z_min::F,
+    z_max::F,
+    center::Vector{F};
+    name::Union{Symbol,Nothing} = nothing,
+)::RevolutionSurface{F} where {F}
+    if isnothing(name)
+        name = snake_case_name(RevolutionSurface)
+    end
+    return RevolutionSurface(name, center, ScalarFunc{F}(r), r_max, z_min, z_max)
+end

@@ -445,3 +445,41 @@ function _intersect_ray!(
     end
     return false
 end
+
+function _intersect_ray!(
+    intersection::Intersection{F},
+    shape::RevolutionSurface{F},
+)::Bool where {F}
+
+    (; ray) = intersection
+    (; loc, dir) = ray
+    (; z_min, z_max, r, r_max) = shape
+
+    closer_intersection_found = false
+
+    # Top and bottom disk
+    if !(dir[3] ≈ 0)
+        t_top = (z_max - loc[3]) / dir[3]
+        r_top = sqrt((loc[1] + dir[1] * t_top)^2 + (loc[2] + dir[2] * t_top)^2)
+        if r_top <= r(z_max)
+            if t_top < intersection.t[1]
+                closer_intersection_found = true
+                intersection.t[1] = t_top
+            end
+        end
+
+        t_bottom = (z_min - loc[3]) / dir[3]
+        r_bottom = sqrt((loc[1] + dir[1] * t_bottom)^2 + (loc[2] + dir[2] * t_bottom)^2)
+        if r_bottom <= r(z_min)
+            if t_bottom < intersection.t[1]
+                closer_intersection_found = true
+                intersection.t[1] = t_bottom
+            end
+        end
+    end
+
+    # Bounding cylinder
+    # See issue, use runner.jl
+
+    return closer_intersection_found
+end

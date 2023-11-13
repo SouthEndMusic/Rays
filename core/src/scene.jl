@@ -8,6 +8,7 @@ struct Scene{F<:AbstractFloat}
     shapes_implicit_surface::Dict{Symbol,ImplicitSurface{F}}
     shapes_sphere::Dict{Symbol,Sphere{F}}
     shapes_triangle_shape::Dict{Symbol,TriangleShape{F}}
+    shape_revolution_surface::Dict{Symbol,RevolutionSurface{F}}
 end
 
 """
