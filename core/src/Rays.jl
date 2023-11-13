@@ -18,7 +18,7 @@ const VectorField = FunctionWrapper{Nothing,Tuple{Vector{F},Vector{F}}} where {F
 include("utils.jl")
 include("camera.jl")
 include("shape.jl")
-include("Texture.jl")
+include("texture.jl")
 include("scene.jl")
 include("intersection.jl")
 include("render.jl")
