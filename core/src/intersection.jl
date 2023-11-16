@@ -86,8 +86,10 @@ function intersect_sphere(
     discr = b^2 - 4 * a * c
 
     if discr >= 0
-        t_int_1 = (-b - sqrt(discr)) / (2 * a)
-        t_int_2 = (-b + sqrt(discr)) / (2 * a)
+        denom = 2 * a
+        sqrt_discr = sqrt(discr)
+        t_int_1 = (-b - sqrt_discr) / denom
+        t_int_2 = (-b + sqrt_discr) / denom
         return t_int_1, t_int_2
     else
         return nothing, nothing
@@ -457,29 +459,75 @@ function _intersect_ray!(
 
     closer_intersection_found = false
 
-    # Top and bottom disk
-    if !(dir[3] ≈ 0)
-        t_top = (z_max - loc[3]) / dir[3]
-        r_top = sqrt((loc[1] + dir[1] * t_top)^2 + (loc[2] + dir[2] * t_top)^2)
-        if r_top <= r(z_max)
-            if t_top < intersection.t[1]
-                closer_intersection_found = true
-                intersection.t[1] = t_top
-            end
-        end
+    if dir[3] ≈ zero(F)
+        return closer_intersection_found
+    end
 
-        t_bottom = (z_min - loc[3]) / dir[3]
-        r_bottom = sqrt((loc[1] + dir[1] * t_bottom)^2 + (loc[2] + dir[2] * t_bottom)^2)
-        if r_bottom <= r(z_min)
-            if t_bottom < intersection.t[1]
-                closer_intersection_found = true
-                intersection.t[1] = t_bottom
-            end
+    # Top disk
+    t_top = (z_max - loc[3]) / dir[3]
+    r_top = sqrt((loc[1] + dir[1] * t_top)^2 + (loc[2] + dir[2] * t_top)^2)
+    if r_top <= r(z_max)
+        if t_top < intersection.t[1]
+            closer_intersection_found = true
+            intersection.t[1] = t_top
+        end
+    end
+
+    # Bottom disk
+    t_bottom = (z_min - loc[3]) / dir[3]
+    r_bottom = sqrt((loc[1] + dir[1] * t_bottom)^2 + (loc[2] + dir[2] * t_bottom)^2)
+    if r_bottom <= r(z_min)
+        if t_bottom < intersection.t[1]
+            closer_intersection_found = true
+            intersection.t[1] = t_bottom
         end
     end
 
     # Bounding cylinder
-    # See issue, use runner.jl
+    a = dir[1]^2 + dir[2]^2
+    b = 2 * (dir[1] * loc[1] + dir[2] * loc[2])
+    c = loc[1]^2 + loc[2]^2
+    discr = b^2 - 4 * a * (c - r_max^2)
+    if discr < zero(F)
+        return false
+    end
+
+    denom = 2 * a
+    sqrt_discr = sqrt(discr)
+    t_int_min = (-b - sqrt_discr) / denom
+    t_int_max = (-b + sqrt_discr) / denom
+
+    t_disks_min = min(t_top, t_bottom)
+    t_disks_max = max(t_top, t_bottom)
+
+    t_min = clamp(t_int_min, t_disks_min, t_disks_max)
+    t_max = clamp(t_int_max, t_disks_min, t_disks_max)
+
+    tol = 1e-5
+    n_divisions = 25
+
+    # Find a sign change from negative to positive in
+    # f(t) = r(o_z + d_z*t) - sqrt((o_x+d_x*t)^2 + (o_y+d_y*t)^2) 
+    # between the closer and further
+    # bounding sphere intersections starting from the closer
+    # and stepping with Δt
+    t_0 = zero(F)
+    Δt = (t_max - t_min) / n_divisions
+    found_t_0 = false
+    for i ∈ 1:n_divisions
+        t_0 = t_min + i * Δt
+        fval = r(loc[3] + dir[3] * t_0) - sqrt(a * t_0^2 + b * t_0 + c)
+        if fval >= 0
+            found_t_0 = true
+            break
+        end
+    end
+
+    if !found_t_0
+        return false
+    end
+
+
 
     return closer_intersection_found
 end
