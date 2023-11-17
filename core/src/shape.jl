@@ -291,13 +291,17 @@ function Base.show(io::IO, implicit_surface::ImplicitSurface)::Nothing
     return nothing
 end
 
-struct RevolutionSurface{F} <: Shape{F}
+struct RevolutionSurface{F,SF<:Union{ScalarFunc{F},Nothing}} <: Shape{F}
     name::Symbol
     center::Vector{F}
     r::ScalarFunc{F}
+    dr::SF
     r_max::F
     z_min::F
     z_max::F
+    n_divisions::Int
+    tol::F
+    itermax::Int
 end
 
 function RevolutionSurface(
@@ -306,10 +310,28 @@ function RevolutionSurface(
     z_min::F,
     z_max::F,
     center::Vector{F};
+    dr::Union{Function,Nothing} = nothing,
     name::Union{Symbol,Nothing} = nothing,
+    itermax::Int = 10,
+    n_divisions::Int = 3,
+    tol::Union{F,Nothing} = nothing,
 )::RevolutionSurface{F} where {F}
     if isnothing(name)
         name = snake_case_name(RevolutionSurface)
     end
-    return RevolutionSurface(name, center, ScalarFunc{F}(r), r_max, z_min, z_max)
+    if isnothing(tol)
+        tol = convert(F, 1e-3)
+    end
+    return RevolutionSurface(
+        name,
+        center,
+        ScalarFunc{F}(r),
+        isnothing(dr) ? nothing : ScalarFunc{F}(dr),
+        r_max,
+        z_min,
+        z_max,
+        n_divisions,
+        tol,
+        itermax,
+    )
 end

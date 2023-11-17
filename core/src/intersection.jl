@@ -453,9 +453,9 @@ function _intersect_ray!(
     shape::RevolutionSurface{F},
 )::Bool where {F}
 
-    (; ray) = intersection
+    (; loc_int, ray) = intersection
     (; loc, dir) = ray
-    (; z_min, z_max, r, r_max) = shape
+    (; z_min, z_max, r, r_max, itermax, tol, n_divisions, dr) = shape
 
     closer_intersection_found = false
 
@@ -489,7 +489,7 @@ function _intersect_ray!(
     c = loc[1]^2 + loc[2]^2
     discr = b^2 - 4 * a * (c - r_max^2)
     if discr < zero(F)
-        return false
+        return closer_intersection_found
     end
 
     denom = 2 * a
@@ -497,14 +497,14 @@ function _intersect_ray!(
     t_int_min = (-b - sqrt_discr) / denom
     t_int_max = (-b + sqrt_discr) / denom
 
-    t_disks_min = min(t_top, t_bottom)
-    t_disks_max = max(t_top, t_bottom)
+    if dir[3] > 0
+        t_min = max(t_int_min, t_bottom)
+        t_max = min(t_int_max, t_top)
+    else
+        t_min = max(t_int_min, t_top)
+        t_max = min(t_int_max, t_bottom)
+    end
 
-    t_min = clamp(t_int_min, t_disks_min, t_disks_max)
-    t_max = clamp(t_int_max, t_disks_min, t_disks_max)
-
-    tol = 1e-5
-    n_divisions = 25
 
     # Find a sign change from negative to positive in
     # f(t) = r(o_z + d_z*t) - sqrt((o_x+d_x*t)^2 + (o_y+d_y*t)^2) 
@@ -524,10 +524,38 @@ function _intersect_ray!(
     end
 
     if !found_t_0
-        return false
+        return closer_intersection_found
     end
 
-
+    t_n = t_0
+    for i ∈ 1:itermax
+        loc_int .= view(dir, :)
+        loc_int *= t_n
+        loc_int += view(loc, :)
+        dist = sqrt(a * t_n^2 + b * t_n + c)
+        z_n = loc[3] + dir[3] * t_n
+        fval = r(z_n) - dist
+        error = abs(fval)
+        if error < tol
+            if t_n < intersection.t[1]
+                intersection.t[1] = t_n
+                closer_intersection_found = true
+            end
+            break
+        else
+            if isnothing(dr)
+                eps = 1e-4
+                dr_value = (r(z_n + eps) - r(z_n)) / eps
+            else
+                dr_value = dr(z_n)
+            end
+            df = dir[3] * dr_value - (b / 2 + a * t_n) / dist
+            t_n -= fval / df
+            if !(t_min <= t_n <= t_max)
+                break
+            end
+        end
+    end
 
     return closer_intersection_found
 end
