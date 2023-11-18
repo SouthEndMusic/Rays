@@ -14,8 +14,8 @@ using SimpleDirectMediaLayer.LibSDL2
 include("utils.jl")
 include("camera.jl")
 include("shape.jl")
-include("scene.jl")
 include("intersection.jl")
+include("scene.jl")
 include("render.jl")
 include("interactive.jl")
 

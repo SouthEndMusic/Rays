@@ -10,7 +10,7 @@ using LinearAlgebra: normalize!, norm
     @test sphere isa Rays.Sphere
     @test string(sphere) == "<Sphere 'sphere'>"
 
-    intersection = Rays.Intersection()
+    intersection = Rays.Intersection(; F = Float64)
     (; ray) = intersection
     ray.loc .= 0.0
     ray.dir .= 1.0
@@ -35,7 +35,7 @@ end
     @test cube isa Rays.Cube
     @test string(cube) == "<Cube 'my_awesome_cube'>"
 
-    intersection = Rays.Intersection()
+    intersection = Rays.Intersection(; F = Float64)
     (; ray) = intersection
     ray.loc .= 0.0
     ray.dir .= [0.0, 1.0, 0.0]
@@ -57,7 +57,7 @@ end
     @test string(sponge) ==
           "<FractalShape 'my_awesome_sponge'; 20 subshapes of type Rays.Cube{Float64}>"
 
-    intersection = Rays.Intersection()
+    intersection = Rays.Intersection(; F = Float64)
     (; ray) = intersection
     ray.loc .= [1.0, 2.0, 3.0]
     ray.dir .= -ray.loc
@@ -80,7 +80,7 @@ end
     @test string(sphere) ==
           "<ImplicitSurface 'sphere'; function 'f' and finite difference gradient>"
 
-    intersection = Rays.Intersection()
+    intersection = Rays.Intersection(; F = Float64)
     (; ray) = intersection
     ray.loc .= 1.0
     ray.dir .= -1.0
@@ -104,7 +104,7 @@ end
     @test string(triangle) ==
           "<TriangleShape 'my_awesome_triangle'; with 3 vertices and 1 faces>"
 
-    intersection = Rays.Intersection()
+    intersection = Rays.Intersection(; F = Float64)
     (; ray) = intersection
     ray.loc .= [0.25, 0.25, 1.0]
     ray.dir .= [0.0, 0.0, -1.0]
@@ -126,7 +126,7 @@ end
     @test string(revolution_shape) ==
           "<RevolutionSurface 'revolution_surface'; function 'r' and finite difference derivative>"
 
-    intersection = Rays.Intersection()
+    intersection = Rays.Intersection(; F = Float64)
     (; ray) = intersection
     ray.loc .= [1.0, 1.0, 0.5]
     ray.dir .= [-1.0, -1.0, 1e-8]

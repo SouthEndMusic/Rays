@@ -1,14 +1,12 @@
+const Intersector = FunctionWrapper{Nothing,Tuple{Intersection{F}}} where {F}
+
 """
 Object for holding the data of all cameras and shapes in a scene.
 """
 struct Scene{F<:AbstractFloat}
     cameras::Dict{Symbol,Camera{F}}
-    shapes_cube::Dict{Symbol,Cube{F}}
-    shapes_fractal_shape::Dict{Symbol,FractalShape{F}}
-    shapes_implicit_surface::Dict{Symbol,ImplicitSurface{F}}
-    shapes_sphere::Dict{Symbol,Sphere{F}}
-    shapes_triangle_shape::Dict{Symbol,TriangleShape{F}}
-    shape_revolution_surface::Dict{Symbol,RevolutionSurface{F}}
+    shapes::Dict{Symbol,Shape{F}}
+    intersectors::Dict{Symbol,Intersector{F}}
 end
 
 """
@@ -24,26 +22,11 @@ function name_exists(scene::Scene, name::Symbol)::Bool
 end
 
 """
-Get a vector of those fields of the scene object which are dictionaries of shapes.
-"""
-function get_shape_dicts(scene::Scene)::Vector{Dict}
-    shape_dicts = Dict[]
-    for fieldname in fieldnames(Rays.Scene)
-        shape_dict = getfield(scene, fieldname)
-        if typeof(shape_dict).parameters[2] <: Shape
-            push!(shape_dicts, shape_dict)
-        end
-    end
-    return shape_dicts
-end
-
-"""
 Remove all shapes from the scene.
 """
 function clear_shapes!(scene::Scene)::Nothing
-    for shape_dicts in get_shape_dicts(scene)
-        empty!(shape_dicts)
-    end
+    empty!(scene.shapes)
+    empty!(scene.intersectors)
     return nothing
 end
 
@@ -54,10 +37,8 @@ function Base.show(io::IO, scene::Scene)::Nothing
         println(io, "\t", camera)
     end
     println(io, "\n* Shapes:")
-    for shape_dict in get_shape_dicts(scene)
-        for shape in values(shape_dict)
-            println(io, "\t", shape)
-        end
+    for shape in values(scene.shapes)
+        println(io, "\t", shape)
     end
 end
 
@@ -74,7 +55,6 @@ such that the new name does not exist yet in the scene.
 """
 function unique_name(name_old::Symbol, scene::Scene)::Symbol
     name_base = string(name_old) * "_"
-    names_camera = keys(scene.cameras)
     i = 0
     while true
         i += 1
@@ -105,6 +85,16 @@ function Base.push!(
 end
 
 """
+Create the anonymous intersection function
+(Done outside Base.push for shapes to avoid runtime dispatch)
+"""
+function create_intersector(shape::Shape)::Function
+    return intersection ->
+        _intersect_ray!(intersection, shape) &&
+            (intersection.name_intersected[1] = shape.name)
+end
+
+"""
 Add a shape to the scene.
 """
 function Base.push!(
@@ -119,14 +109,11 @@ function Base.push!(
         @debug "name $name already used in scene, changed to $name_new."
         name = name_new
     end
+    scene.shapes[name] = shape
 
-    # Put shape in shape dictionary of corresponding type
-    for shape_dict in get_shape_dicts(scene)
-        shape_type = typeof(shape_dict).parameters[2]
-        if shape isa shape_type
-            shape_dict[name] = shape
-            break
-        end
-    end
+    # Define intersector for this shape
+    scene.intersectors[name] = Intersector{F}(create_intersector(shape))
+    # Call the intersector once
+    scene.intersectors[name](Intersection(; F))
     return nothing
 end

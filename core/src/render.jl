@@ -7,16 +7,13 @@ where dist_max is the maximum distance between the camera location and
 the center of a shape.
 """
 function set_dropoff_curve_default!(scene::Scene{F}, camera::Camera{F})::Camera{F} where {F}
-    shape_dicts = get_shape_dicts(scene)
-    if sum([length(shape_dict) for shape_dict in shape_dicts]) == 0
+    if length(scene.shapes) == 0
         error("Cannot determine default dropoff curve without shapes in the scene.")
     end
     dist_max = zero(F)
 
-    for shape_dict in shape_dicts
-        for shape in values(shape_dict)
-            dist_max = max(dist_max, norm(camera.loc - shape.center))
-        end
+    for shape in values(scene.shapes)
+        dist_max = max(dist_max, norm(camera.loc - shape.center))
     end
     dropoff_curve =
         ScalarFunc{F}(t -> max(zero(F), one(F) - t / (convert(F, 1.5) * dist_max)))
@@ -173,7 +170,7 @@ function render!(
     n_pixels = prod(screen_res)
 
     # Intersection objects
-    intersections = Intersection{F}[Intersection() for i ∈ 1:nthreads()]
+    intersections = [Intersection(; F) for i ∈ 1:nthreads()]
 
     # Reset the canvas
     canvas .= one(F)
@@ -184,23 +181,8 @@ function render!(
             indices = CI[I_flat]
             set_ray!(intersection.ray, camera, Tuple(indices))
 
-            for shape in values(scene.shapes_cube)
-                intersect_ray!(intersection, shape)
-            end
-            for shape in values(scene.shapes_fractal_shape)
-                intersect_ray!(intersection, shape)
-            end
-            for shape in values(scene.shapes_implicit_surface)
-                intersect_ray!(intersection, shape)
-            end
-            for shape in values(scene.shapes_sphere)
-                intersect_ray!(intersection, shape)
-            end
-            for shape in values(scene.shapes_triangle_shape)
-                intersect_ray!(intersection, shape)
-            end
-            for shape in values(scene.shape_revolution_surface)
-                intersect_ray!(intersection, shape)
+            for intersector! in values(scene.intersectors)
+                intersector!(intersection)
             end
 
             t = intersection.t

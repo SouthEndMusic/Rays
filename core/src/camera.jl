@@ -194,15 +194,8 @@ end
 """
 Construct a ray.
 """
-function Ray()::Ray
-    return Ray(zeros(3), [1.0, 0.0, 0.0])
-end
-
-"""
-Convert between rays with different type parameters.
-"""
-function Base.convert(::Type{Ray{F}}, ray::Ray) where {F}
-    return Ray{F}(ray.loc, ray.dir)
+function Ray(; F = Float32)::Ray
+    return Ray(zeros(F, 3), F[1.0, 0.0, 0.0])
 end
 
 """
