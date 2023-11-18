@@ -21,30 +21,24 @@ struct Intersection{F<:AbstractFloat}
     grad::Vector{F}
 end
 
-function Base.convert(::Type{Intersection{F}}, intersection::Intersection) where {F}
-    return Intersection{F}(
-        [getfield(intersection, fieldname) for fieldname in fieldnames(Intersection)]...,
-    )
-end
-
 """
 Get default values for the metadata of the intersection of
 a certain shape for when there is no intersection.
 """
-function Intersection()::Intersection
+function Intersection(; F = Float32)::Intersection
     return Intersection(
-        Ray(), # ray
-        Ray{Float64}[],
-        [Inf], # t 
+        Ray(; F), # ray
+        Ray{F}[],
+        [F(Inf)], # t 
         [0], # dim 
-        zeros(3), # u
-        zeros(3), # v
-        zeros(3), # diff
-        zeros(3), # diff2
+        zeros(F, 3), # u
+        zeros(F, 3), # v
+        zeros(F, 3), # diff
+        zeros(F, 3), # diff2
         [0], # face
         [:none], # name_intersected
-        zeros(3), # loc_int
-        zeros(3), # grad
+        zeros(F, 3), # loc_int
+        zeros(F, 3), # grad
     )
 end
 
@@ -54,17 +48,6 @@ Set the intersection to a non-intersected state.
 function reset_intersection!(intersection::Intersection)::Nothing
     intersection.t[1] = Inf
     intersection.name_intersected[1] = :none
-    return nothing
-end
-
-"""
-If a closer intersection was found, set the name of the intersected shape
-in the intersection data.
-"""
-function intersect_ray!(intersection::Intersection{F}, shape::Shape{F})::Nothing where {F}
-    if _intersect_ray!(intersection, shape)
-        intersection.name_intersected[1] = shape.name
-    end
     return nothing
 end
 
@@ -86,8 +69,10 @@ function intersect_sphere(
     discr = b^2 - 4 * a * c
 
     if discr >= 0
-        t_int_1 = (-b - sqrt(discr)) / (2 * a)
-        t_int_2 = (-b + sqrt(discr)) / (2 * a)
+        denom = 2 * a
+        sqrt_discr = sqrt(discr)
+        t_int_1 = (-b - sqrt_discr) / denom
+        t_int_2 = (-b + sqrt_discr) / denom
         return t_int_1, t_int_2
     else
         return nothing, nothing
@@ -444,4 +429,116 @@ function _intersect_ray!(
         end
     end
     return false
+end
+
+function _intersect_ray!(
+    intersection::Intersection{F},
+    shape::RevolutionSurface{F},
+)::Bool where {F}
+
+    (; loc_int, ray) = intersection
+    (; loc, dir) = ray
+    (; z_min, z_max, r, r_max, itermax, tol, n_divisions, dr) = shape
+
+    closer_intersection_found = false
+
+    if dir[3] ≈ zero(F)
+        return closer_intersection_found
+    end
+
+    # Top disk
+    t_top = (z_max - loc[3]) / dir[3]
+    r_top = sqrt((loc[1] + dir[1] * t_top)^2 + (loc[2] + dir[2] * t_top)^2)
+    if r_top <= r(z_max)
+        if t_top < intersection.t[1]
+            closer_intersection_found = true
+            intersection.t[1] = t_top
+        end
+    end
+
+    # Bottom disk
+    t_bottom = (z_min - loc[3]) / dir[3]
+    r_bottom = sqrt((loc[1] + dir[1] * t_bottom)^2 + (loc[2] + dir[2] * t_bottom)^2)
+    if r_bottom <= r(z_min)
+        if t_bottom < intersection.t[1]
+            closer_intersection_found = true
+            intersection.t[1] = t_bottom
+        end
+    end
+
+    # Bounding cylinder
+    a = dir[1]^2 + dir[2]^2
+    b = 2 * (dir[1] * loc[1] + dir[2] * loc[2])
+    c = loc[1]^2 + loc[2]^2
+    discr = b^2 - 4 * a * (c - r_max^2)
+    if discr < zero(F)
+        return closer_intersection_found
+    end
+
+    denom = 2 * a
+    sqrt_discr = sqrt(discr)
+    t_int_min = (-b - sqrt_discr) / denom
+    t_int_max = (-b + sqrt_discr) / denom
+
+    if dir[3] > 0
+        t_min = max(t_int_min, t_bottom)
+        t_max = min(t_int_max, t_top)
+    else
+        t_min = max(t_int_min, t_top)
+        t_max = min(t_int_max, t_bottom)
+    end
+
+
+    # Find a sign change from negative to positive in
+    # f(t) = r(o_z + d_z*t) - sqrt((o_x+d_x*t)^2 + (o_y+d_y*t)^2) 
+    # between the closer and further
+    # bounding sphere intersections starting from the closer
+    # and stepping with Δt
+    t_0 = zero(F)
+    Δt = (t_max - t_min) / n_divisions
+    found_t_0 = false
+    for i ∈ 1:n_divisions
+        t_0 = t_min + i * Δt
+        fval = r(loc[3] + dir[3] * t_0) - sqrt(a * t_0^2 + b * t_0 + c)
+        if fval >= 0
+            found_t_0 = true
+            break
+        end
+    end
+
+    if !found_t_0
+        return closer_intersection_found
+    end
+
+    t_n = t_0
+    for i ∈ 1:itermax
+        loc_int .= view(dir, :)
+        loc_int *= t_n
+        loc_int += view(loc, :)
+        dist = sqrt(a * t_n^2 + b * t_n + c)
+        z_n = loc[3] + dir[3] * t_n
+        fval = r(z_n) - dist
+        error = abs(fval)
+        if error < tol
+            if t_n < intersection.t[1]
+                intersection.t[1] = t_n
+                closer_intersection_found = true
+            end
+            break
+        else
+            if isnothing(dr)
+                eps = 1e-4
+                dr_value = (r(z_n + eps) - r(z_n)) / eps
+            else
+                dr_value = dr(z_n)
+            end
+            df = dir[3] * dr_value - (b / 2 + a * t_n) / dist
+            t_n -= fval / df
+            if !(t_min <= t_n <= t_max)
+                break
+            end
+        end
+    end
+
+    return closer_intersection_found
 end

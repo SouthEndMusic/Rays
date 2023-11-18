@@ -205,6 +205,7 @@ which is a scalar field assumed to be C1 smooth.
 Note: the function f must change sign across the level 0 set
 to be detected propery.
 
+name: The name of the same
 center: The center of the shape
 f: The scalar field function
 ∇f!: The (in place) gradient function of f. If not provided,
@@ -229,20 +230,8 @@ struct ImplicitSurface{F,VF<:Union{VectorField{F},Nothing}} <: Shape{F}
     itermax::Int
 end
 
-function Base.convert(
-    ::Type{ImplicitSurface{F,VF}},
-    implicit_surface::ImplicitSurface,
-) where {F,VF}
-    return ImplicitSurface{F,VF}(
-        [
-            getfield(implicit_surface, fieldname) for
-            fieldname in fieldnames(ImplicitSurface)
-        ]...,
-    )
-end
-
 """
-Construct an Implicit surface with optional rootfinding
+Construct an implicit surface with optional rootfinding
 parameters.
 """
 function ImplicitSurface(
@@ -285,5 +274,80 @@ function Base.show(io::IO, implicit_surface::ImplicitSurface)::Nothing
     gradient_descr =
         isnothing(∇f!) ? "finite difference gradient" : "gradient \'$(∇f!.obj.x)\'"
     print(io, "<ImplicitSurface \'$name\'; function \'$(f.obj.x)\' and $gradient_descr>")
+    return nothing
+end
+
+"""
+A shape defined as the points a distance r(z) from the z-axis,
+with closing disks at z_min and z_max.
+
+name: The name of the shape
+center: The center of the shape
+r: The distance function from the z-axis
+dr: The derivative of r. If not provided, 
+	a finite difference derivative is used
+r_max: The maximum value of r between z_min and z_max
+z_min: The minimum z-value (and the location of a closing disk)
+z_max: The maximum z-value (and the location of a closing disk)
+n_divisions: The amount of steps used between the 2 intersections
+	of the bounding cylinder to find a crossing of r
+tol: The tolerance of approximating a zero of r:
+	|r - <distance to z-axis>| < tol 
+itermax: The maximum amount of Newton iterations used to find 
+	a crossing of r along a ray within the specified tolerance
+"""
+struct RevolutionSurface{F,SF<:Union{ScalarFunc{F},Nothing}} <: Shape{F}
+    name::Symbol
+    center::Vector{F}
+    r::ScalarFunc{F}
+    dr::SF
+    r_max::F
+    z_min::F
+    z_max::F
+    n_divisions::Int
+    tol::F
+    itermax::Int
+end
+
+"""
+Construct a revolution surface with optional rootfinding
+parameters.
+"""
+function RevolutionSurface(
+    r::Function,
+    r_max::F,
+    z_min::F,
+    z_max::F,
+    center::Vector{F};
+    dr::Union{Function,Nothing} = nothing,
+    name::Union{Symbol,Nothing} = nothing,
+    itermax::Int = 10,
+    n_divisions::Int = 3,
+    tol::Union{F,Nothing} = nothing,
+)::RevolutionSurface{F} where {F}
+    if isnothing(name)
+        name = snake_case_name(RevolutionSurface)
+    end
+    if isnothing(tol)
+        tol = convert(F, 1e-3)
+    end
+    return RevolutionSurface(
+        name,
+        center,
+        ScalarFunc{F}(r),
+        isnothing(dr) ? nothing : ScalarFunc{F}(dr),
+        r_max,
+        z_min,
+        z_max,
+        n_divisions,
+        tol,
+        itermax,
+    )
+end
+
+function Base.show(io::IO, implicit_surface::RevolutionSurface)::Nothing
+    (; name, r, dr) = implicit_surface
+    dr_descr = isnothing(dr) ? "finite difference derivative" : "derivative \'$(dr.obj.x)\'"
+    print(io, "<RevolutionSurface \'$name\'; function \'$(r.obj.x)\' and $dr_descr>")
     return nothing
 end
