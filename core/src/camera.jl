@@ -118,11 +118,12 @@ Get a default camera instance
 """
 function Camera(;
     screen_res::Vector{Int} = [100, 100],
+    screen_size::Vector{<:AbstractFloat} = [0.1, 0.1],
     float_type = Float32,
     name::Union{Symbol,Nothing} = nothing,
 )::Camera
     default_values_float =
-        Vector{float_type}[zeros(3), [1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.1, 0.1], [0.1]]
+        Vector{float_type}[zeros(3), [1.0, 0.0, 0.0], [0.0, 0.0, 1.0], screen_size, [0.1]]
 
     return Camera(default_values_float..., screen_res; name)
 end

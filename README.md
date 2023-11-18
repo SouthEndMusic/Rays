@@ -6,9 +6,10 @@
 ## Examples
 
 Examples can be found in:
-- `examples/Getting_started.ipynb`
-- `examples/Interactive_rendering.ipynb`
+- `examples/Getting_started_shapes.ipynb`
+- `examples/Getting_started_textures.ipynb`
+- `examples/Getting_started_interactive.ipynb`
 
 ## Contributing
 
-This is a hobby project of mine, partly to learn how to write good Julia code. Therefore I do not accept contributions, only suggestions (:
+This is a hobby project of mine, partly to learn how to write good Julia code. Therefore I do not accept contributions, only suggestions 🙂

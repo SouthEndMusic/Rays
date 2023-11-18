@@ -13,6 +13,10 @@ struct ColorFieldTexture{F} <: Texture{F}
     field!::VectorField{F}
 end
 
+function ColorFieldTexture(field!::Function; F = Float32)::ColorFieldTexture
+    return ColorFieldTexture(VectorField{F}(field!))
+end
+
 function color!(intersection::Intersection{F}, texture::UniformTexture)::Nothing where {F}
     (; color) = intersection
     color .= view(texture.color, :)
@@ -50,5 +54,6 @@ function color!(
     loc_int .*= t[1]
     loc_int .+= view(loc, :)
 
-    texture.field(color, loc_int)
+    texture.field!(color, loc_int)
+    return nothing
 end
