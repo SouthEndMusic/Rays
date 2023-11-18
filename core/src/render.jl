@@ -117,8 +117,8 @@ function add_depth_of_field!(camera::Camera{F})::Nothing where {F}
 end
 
 function set_color!(
-    camera::Camera,
-    intersection::Intersection,
+    camera::Camera{F},
+    intersection::Intersection{F},
     texturers::Dict{Symbol,Texturer{F}},
     pixel_indices::Tuple{Int,Int},
 )::Nothing where {F}
@@ -133,7 +133,7 @@ function set_color!(
     end
 
     # Set texture color
-    canvas[:, pixel_indices...] .*= view(intersection.color, :)
+    @views(canvas[:, pixel_indices...] .*= intersection.color[:])
     return nothing
 end
 
@@ -147,10 +147,10 @@ function render!(
 )::Nothing where {F}
 
     # If no camera is specified, take the first one
-    if isnothing(name_camera)
-        camera = first(values(scene.cameras))
+    camera::Camera{F} = if isnothing(name_camera)
+        first(values(scene.cameras))
     else
-        camera = scene.cameras[name_camera]
+        scene.cameras[name_camera]
     end
 
     (; intersectors, texturers) = scene
@@ -186,7 +186,7 @@ function render!(
 
             # Apply shading
             t = intersection.t
-            view(t_intersect, [indices]) .= view(t, :)
+            t_intersect[indices] = t[1]
             if cam_is_source
                 cam_is_source!(
                     camera,
