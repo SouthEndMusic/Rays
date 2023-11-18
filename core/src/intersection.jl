@@ -21,30 +21,24 @@ struct Intersection{F<:AbstractFloat}
     grad::Vector{F}
 end
 
-function Base.convert(::Type{Intersection{F}}, intersection::Intersection) where {F}
-    return Intersection{F}(
-        [getfield(intersection, fieldname) for fieldname in fieldnames(Intersection)]...,
-    )
-end
-
 """
 Get default values for the metadata of the intersection of
 a certain shape for when there is no intersection.
 """
-function Intersection()::Intersection
+function Intersection(; F = Float32)::Intersection
     return Intersection(
-        Ray(), # ray
-        Ray{Float64}[],
-        [Inf], # t 
+        Ray(; F), # ray
+        Ray{F}[],
+        [F(Inf)], # t 
         [0], # dim 
-        zeros(3), # u
-        zeros(3), # v
-        zeros(3), # diff
-        zeros(3), # diff2
+        zeros(F, 3), # u
+        zeros(F, 3), # v
+        zeros(F, 3), # diff
+        zeros(F, 3), # diff2
         [0], # face
         [:none], # name_intersected
-        zeros(3), # loc_int
-        zeros(3), # grad
+        zeros(F, 3), # loc_int
+        zeros(F, 3), # grad
     )
 end
 
@@ -54,17 +48,6 @@ Set the intersection to a non-intersected state.
 function reset_intersection!(intersection::Intersection)::Nothing
     intersection.t[1] = Inf
     intersection.name_intersected[1] = :none
-    return nothing
-end
-
-"""
-If a closer intersection was found, set the name of the intersected shape
-in the intersection data.
-"""
-function intersect_ray!(intersection::Intersection{F}, shape::Shape{F})::Nothing where {F}
-    if _intersect_ray!(intersection, shape)
-        intersection.name_intersected[1] = shape.name
-    end
     return nothing
 end
 
