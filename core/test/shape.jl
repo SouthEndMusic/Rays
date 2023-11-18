@@ -117,3 +117,21 @@ end
     closer_intersection_found = Rays._intersect_ray!(intersection, triangle)
     @test !closer_intersection_found
 end
+
+@testset "RevolutionSurface" begin
+    center = zeros(3)
+    r(z) = z^2
+    revolution_shape =
+        Rays.RevolutionSurface(r, 1.0, -1.0, 1.0, center; tol = 1e-7, n_divisions = 50)
+    @test string(revolution_shape) ==
+          "<RevolutionSurface 'revolution_surface'; function 'r' and finite difference derivative>"
+
+    intersection = Rays.Intersection()
+    (; ray) = intersection
+    ray.loc .= [1.0, 1.0, 0.5]
+    ray.dir .= [-1.0, -1.0, 1e-8]
+    normalize!(ray.dir)
+    closer_intersection_found = Rays._intersect_ray!(intersection, revolution_shape)
+    @test closer_intersection_found
+    @test intersection.t[1] ≈ sqrt(2.0) - 0.25
+end

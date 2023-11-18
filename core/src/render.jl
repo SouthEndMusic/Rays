@@ -199,6 +199,9 @@ function render!(
             for shape in values(scene.shapes_triangle_shape)
                 intersect_ray!(intersection, shape)
             end
+            for shape in values(scene.shape_revolution_surface)
+                intersect_ray!(intersection, shape)
+            end
 
             t = intersection.t
             view(t_intersect, [indices]) .= view(t, :)
