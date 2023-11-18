@@ -165,9 +165,9 @@ Point the camera to 'to' from 'to' plus the spherical coordinates given by dist,
 function look_at!(
     camera::Camera{F},
     to::AbstractVector{F},
-    dist::AbstractFloat,
-    θ::AbstractFloat,
-    ϕ::AbstractFloat,
+    dist::F,
+    θ::F,
+    ϕ::F,
 )::Nothing where {F}
     from = to + dist * [
         cos(θ) * sin(ϕ)

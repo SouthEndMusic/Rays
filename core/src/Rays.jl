@@ -12,15 +12,15 @@ using SimpleDirectMediaLayer.LibSDL2
 
 const ScalarFunc = FunctionWrapper{F,Tuple{F}} where {F<:AbstractFloat}
 const Transform = FunctionWrapper{Nothing,Tuple{Vector{F}}} where {F<:AbstractFloat}
-const ScalarField = FunctionWrapper{F,Tuple{Vector{F}}} where {F}
-const VectorField = FunctionWrapper{Nothing,Tuple{Vector{F},Vector{F}}} where {F}
+const ScalarField = FunctionWrapper{F,Tuple{Vector{F}}} where {F<:AbstractFloat}
+const VectorField =
+    FunctionWrapper{Nothing,Tuple{Vector{F},Vector{F}}} where {F<:AbstractFloat}
 
 include("utils.jl")
 include("camera.jl")
 include("shape.jl")
-include("texture.jl")
-include("scene.jl")
 include("intersection.jl")
+include("texture.jl")
 include("scene.jl")
 include("render.jl")
 include("interactive.jl")

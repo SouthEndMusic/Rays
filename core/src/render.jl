@@ -116,27 +116,24 @@ function add_depth_of_field!(camera::Camera{F})::Nothing where {F}
     return nothing
 end
 
-"""
-Apply a colormapping metadata -> colormapping to the color array.
-color_palette: (3, n_colors) array
-metadata: a metadata value of n yields the nth color in color color_palette
-a metadata value of 0 yields no change in color
-"""
 function set_color!(
-    camera::Camera{F},
-    variable::Symbol,
-    intersection::Intersection{F},
-    color_palette::AbstractMatrix{F},
+    camera::Camera,
+    intersection::Intersection,
+    texturers::Dict{Symbol,Texturer{F}},
     pixel_indices::Tuple{Int,Int},
 )::Nothing where {F}
+    (; name_intersected) = intersection
     (; canvas) = camera
 
-    data_value::Int = getfield(intersection, variable)[1]
-    name_intersected = intersection.name_intersected[1]
-
-    if name_intersected !== :none
-        @views(canvas[:, pixel_indices...] .*= color_palette[:, data_value])
+    # Get texture color
+    if name_intersected[1] == :none
+        intersection.color .= zero(F)
+    else
+        texturers[name_intersected[1]](intersection)
     end
+
+    # Set texture color
+    canvas[:, pixel_indices...] .*= view(intersection.color, :)
     return nothing
 end
 
@@ -147,8 +144,6 @@ function render!(
     scene::Scene{F};
     name_camera::Union{Symbol,Nothing} = nothing,
     cam_is_source::Bool = true,
-    color_palette::Union{AbstractMatrix{F},Nothing} = nothing,
-    variable::Union{Symbol,Nothing} = nothing,
 )::Nothing where {F}
 
     # If no camera is specified, take the first one
@@ -158,6 +153,7 @@ function render!(
         camera = scene.cameras[name_camera]
     end
 
+    (; intersectors, texturers) = scene
     (; canvas, t_intersect, screen_res, focus_curve) = camera
 
     # Number of tasks
@@ -179,12 +175,16 @@ function render!(
         intersection = intersections[threadid()]
         for I_flat ∈ task:n_tasks:n_pixels
             indices = CI[I_flat]
+
+            # Set the ray based on the current pixel of the camera
             set_ray!(intersection.ray, camera, Tuple(indices))
 
-            for intersector! in values(scene.intersectors)
+            # Calculate shape intersections
+            for intersector! in values(intersectors)
                 intersector!(intersection)
             end
 
+            # Apply shading
             t = intersection.t
             view(t_intersect, [indices]) .= view(t, :)
             if cam_is_source
@@ -195,9 +195,8 @@ function render!(
                     Tuple(indices),
                 )
             end
-            if !isnothing(color_palette) && !isnothing(variable)
-                set_color!(camera, variable, intersection, color_palette, indices.I)
-            end
+
+            set_color!(camera, intersection, texturers, Tuple(indices))
             reset_intersection!(intersection)
         end
     end

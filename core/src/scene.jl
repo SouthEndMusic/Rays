@@ -1,4 +1,5 @@
 const Intersector = FunctionWrapper{Nothing,Tuple{Intersection{F}}} where {F}
+const Texturer = FunctionWrapper{Nothing,Tuple{Intersection{F}}} where {F}
 
 """
 Object for holding the data of all cameras and shapes in a scene.
@@ -7,6 +8,7 @@ struct Scene{F<:AbstractFloat}
     cameras::Dict{Symbol,Camera{F}}
     shapes::Dict{Symbol,Shape{F}}
     intersectors::Dict{Symbol,Intersector{F}}
+    texturers::Dict{Symbol,Texturer{F}}
 end
 
 """
@@ -27,6 +29,7 @@ Remove all shapes from the scene.
 function clear_shapes!(scene::Scene)::Nothing
     empty!(scene.shapes)
     empty!(scene.intersectors)
+    empty!(scene.texturers)
     return nothing
 end
 
@@ -85,7 +88,7 @@ function Base.push!(
 end
 
 """
-Create the anonymous intersection function
+Create the anonymous intersector function
 (Done outside Base.push for shapes to avoid runtime dispatch)
 """
 function create_intersector(shape::Shape)::Function
@@ -95,13 +98,35 @@ function create_intersector(shape::Shape)::Function
 end
 
 """
+Create the anonymous texturer function
+(Done outside Base.push for shapes to avoid runtime dispatch)
+"""
+function create_texturer(texture::Texture)::Function
+    return intersection -> color!(intersection, texture)
+end
+
+function set_texture!(
+    scene::Scene{F},
+    shape_name::Symbol,
+    texture::Texture{F},
+)::Nothing where {F}
+    if !haskey(scene.shapes, shape_name)
+        error("Scene contains no shape with name \'$shape_name\'.")
+    end
+    scene.texturers[shape_name] = Texturer{F}(create_texturer(texture))
+    return nothing
+end
+
+"""
 Add a shape to the scene.
 """
 function Base.push!(
     scene::Scene{F},
     shape::Shape{F};
     replace::Bool = false,
+    texture::Union{Texture{F},Nothing} = nothing,
 )::Nothing where {F}
+    ## Name
     name = shape.name
     if !replace && name_exists(scene, name)
         name_new = unique_name(name, scene)
@@ -111,9 +136,17 @@ function Base.push!(
     end
     scene.shapes[name] = shape
 
+    ## Intersector
     # Define intersector for this shape
     scene.intersectors[name] = Intersector{F}(create_intersector(shape))
     # Call the intersector once
     scene.intersectors[name](Intersection(; F))
+
+    ## Texturer
+    if isnothing(texture)
+        texture = UniformTexture(ones(F, 3))
+    end
+    set_texture!(scene, name, texture)
+
     return nothing
 end

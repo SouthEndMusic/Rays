@@ -10,35 +10,45 @@ struct IntegerMappingTexture{F} <: Texture{F}
 end
 
 struct ColorFieldTexture{F} <: Texture{F}
-    field::VectorField{F}
+    field!::VectorField{F}
 end
 
-function color!(
-    color::AbstractVector{F},
-    intersection::Intersection{F},
-    texture::UniformTexture,
-)::Nothing
-    color .= texture.color
+function color!(intersection::Intersection{F}, texture::UniformTexture)::Nothing where {F}
+    (; color) = intersection
+    color .= view(texture.color, :)
     return nothing
 end
 
 function color!(
-    color::AbstractVector{F},
     intersection::Intersection{F},
     texture::IntegerMappingTexture,
-)::nothing
-
+)::Nothing where {F}
     (; variable, mapping) = texture
+    (; color, face, dim) = intersection
 
     # getfield would lead to runtime dispatch
     if variable == :dim
-        value = intersection.dim[1]
+        value = dim[1]
     elseif variable == :face
-        value = intersection.face[1]
+        value = face[1]
     else
         error("Invalid integer intersection variable \'$variable\'.")
     end
 
-    color .= mapping[:, data_value]
+    color .= view(mapping, :, value)
     return nothing
+end
+
+function color!(
+    intersection::Intersection{F},
+    texture::ColorFieldTexture,
+)::Nothing where {F}
+    (; loc_int, ray, t, color) = intersection
+    (; loc, dir) = ray
+
+    loc_int .= view(dir, :)
+    loc_int .*= t[1]
+    loc_int .+= view(loc, :)
+
+    texture.field(color, loc_int)
 end
