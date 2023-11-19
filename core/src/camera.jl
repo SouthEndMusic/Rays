@@ -1,6 +1,3 @@
-const ScalarFunc = FunctionWrapper{F,Tuple{F}} where {F<:AbstractFloat}
-const Transform = FunctionWrapper{Nothing,Tuple{Vector{F}}} where {F<:AbstractFloat}
-
 """
 name: the name of the camera
 loc: The location of the camera in space
@@ -121,11 +118,12 @@ Get a default camera instance
 """
 function Camera(;
     screen_res::Vector{Int} = [100, 100],
+    screen_size::Vector{<:AbstractFloat} = [0.1, 0.1],
     float_type = Float32,
     name::Union{Symbol,Nothing} = nothing,
 )::Camera
     default_values_float =
-        Vector{float_type}[zeros(3), [1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.1, 0.1], [0.1]]
+        Vector{float_type}[zeros(3), [1.0, 0.0, 0.0], [0.0, 0.0, 1.0], screen_size, [0.1]]
 
     return Camera(default_values_float..., screen_res; name)
 end
@@ -168,9 +166,9 @@ Point the camera to 'to' from 'to' plus the spherical coordinates given by dist,
 function look_at!(
     camera::Camera{F},
     to::AbstractVector{F},
-    dist::AbstractFloat,
-    θ::AbstractFloat,
-    ϕ::AbstractFloat,
+    dist::F,
+    θ::F,
+    ϕ::F,
 )::Nothing where {F}
     from = to + dist * [
         cos(θ) * sin(ϕ)

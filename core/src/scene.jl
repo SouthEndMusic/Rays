@@ -1,4 +1,5 @@
 const Intersector = FunctionWrapper{Nothing,Tuple{Intersection{F}}} where {F}
+const Texturer = FunctionWrapper{Nothing,Tuple{Intersection{F}}} where {F}
 
 """
 Object for holding the data of all cameras and shapes in a scene.
@@ -7,6 +8,7 @@ struct Scene{F<:AbstractFloat}
     cameras::Dict{Symbol,Camera{F}}
     shapes::Dict{Symbol,Shape{F}}
     intersectors::Dict{Symbol,Intersector{F}}
+    texturers::Dict{Symbol,Texturer{F}}
 end
 
 """
@@ -27,6 +29,7 @@ Remove all shapes from the scene.
 function clear_shapes!(scene::Scene)::Nothing
     empty!(scene.shapes)
     empty!(scene.intersectors)
+    empty!(scene.texturers)
     return nothing
 end
 
@@ -67,12 +70,15 @@ end
 
 """
 Add a camera to the scene.
+If replace = false, a new name with suffix _i is generated for the camera
+with i the smallest integer such that the new name is unique in the scene.
+NOTE: This creates a new camera instance which is returned by this function.
 """
 function Base.push!(
     scene::Scene{F},
     camera::Camera{F};
     replace::Bool = false,
-)::Nothing where {F}
+)::Camera{F} where {F}
     name = camera.name
     if !replace && name_exists(scene, name)
         name_new = unique_name(name, scene)
@@ -81,11 +87,11 @@ function Base.push!(
         name = name_new
     end
     scene.cameras[name] = camera
-    return nothing
+    return camera
 end
 
 """
-Create the anonymous intersection function
+Create the anonymous intersector function
 (Done outside Base.push for shapes to avoid runtime dispatch)
 """
 function create_intersector(shape::Shape)::Function
@@ -95,13 +101,39 @@ function create_intersector(shape::Shape)::Function
 end
 
 """
-Add a shape to the scene.
+Create the anonymous texturer function
+(Done outside Base.push for shapes to avoid runtime dispatch)
+"""
+function create_texturer(texture::Texture)::Function
+    return intersection -> color!(intersection, texture)
+end
+
+function set_texture!(
+    scene::Scene{F},
+    shape_name::Symbol,
+    texture::Texture{F},
+)::Nothing where {F}
+    if !haskey(scene.shapes, shape_name)
+        error("Scene contains no shape with name \'$shape_name\'.")
+    end
+    scene.texturers[shape_name] = Texturer{F}(create_texturer(texture))
+    return nothing
+end
+
+"""
+Add a shape to the scene. Features:
+- If replace = false, a new name with suffix _i is generated for the shape
+  with i the smallest integer such that the new name is unique in the scene.
+  NOTE: This creates a new shape instance which is returned by this function.
+- If no texture is given, a default uniform white texture is assigned
 """
 function Base.push!(
     scene::Scene{F},
     shape::Shape{F};
     replace::Bool = false,
-)::Nothing where {F}
+    texture::Union{Texture{F},Nothing} = nothing,
+)::Shape{F} where {F}
+    ## Name
     name = shape.name
     if !replace && name_exists(scene, name)
         name_new = unique_name(name, scene)
@@ -111,9 +143,17 @@ function Base.push!(
     end
     scene.shapes[name] = shape
 
+    ## Intersector
     # Define intersector for this shape
     scene.intersectors[name] = Intersector{F}(create_intersector(shape))
     # Call the intersector once
     scene.intersectors[name](Intersection(; F))
-    return nothing
+
+    ## Texturer
+    if isnothing(texture)
+        texture = UniformTexture(ones(F, 3))
+    end
+    set_texture!(scene, name, texture)
+
+    return shape
 end

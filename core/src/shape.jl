@@ -1,8 +1,5 @@
 abstract type Shape{F<:AbstractFloat} end
 
-const ScalarField = FunctionWrapper{F,Tuple{Vector{F}}} where {F}
-const VectorField = FunctionWrapper{Nothing,Tuple{Vector{F},Vector{F}}} where {F}
-
 struct Sphere{F} <: Shape{F}
     name::Symbol
     center::Vector{F}

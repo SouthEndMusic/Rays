@@ -16,9 +16,11 @@ struct Intersection{F<:AbstractFloat}
     diff2::Vector{F}
     face::Vector{Int}
     name_intersected::Vector{Symbol}
-    # For implicit surface intersections
+    # For implicit surface intersections and coloring
     loc_int::Vector{F}
     grad::Vector{F}
+    # For coloring
+    color::Vector{F}
 end
 
 """
@@ -39,6 +41,7 @@ function Intersection(; F = Float32)::Intersection
         [:none], # name_intersected
         zeros(F, 3), # loc_int
         zeros(F, 3), # grad
+        zeros(F, 3), # color
     )
 end
 
