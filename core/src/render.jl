@@ -182,7 +182,7 @@ function render!(
             indices = CI[I_flat]
 
             # Set the ray based on the current pixel of the camera
-            set_ray!(intersection.ray, camera, Tuple(indices))
+            set_ray!(intersection.ray_camera, camera, Tuple(indices))
 
             # Calculate shape intersections
             for intersector! in values(intersectors)

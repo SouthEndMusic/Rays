@@ -19,7 +19,6 @@ end
     Rays.look_at!(camera, from, to)
     push!(scene, camera)
 
-    origin = zeros(Float32, 3)
     R = 1.0f0
 
     function my_field(loc::Vector{F})::F where {F}
@@ -33,14 +32,13 @@ end
     end
 
     shapes = [
-        Rays.Cube(origin, R),
-        Rays.menger_sponge(origin, R, 4),
-        Rays.Sphere(origin, R),
-        Rays.Tetrahedron(origin, R),
-        Rays.sierpinski_pyramid(origin, R, 4),
+        Rays.Cube(R),
+        Rays.menger_sponge(R, 4),
+        Rays.Sphere(R),
+        Rays.Tetrahedron(R),
+        Rays.sierpinski_pyramid(R, 4),
         Rays.ImplicitSurface(
             my_field,
-            origin,
             R_bound = 1.5f0,
             n_divisions = 50,
             tol = 1.0f-5,
@@ -113,9 +111,8 @@ end
     n_cubes = 250
 
     for i ∈ 1:n_cubes
-        center = rand(Float32, 3) * 2 .- 1
         R = rand(Float32) / 10
-        cube = Rays.Cube(center, R)
+        cube = Rays.Cube(R)
         push!(scene, cube)
     end
 
@@ -133,9 +130,8 @@ end
     Rays.look_at!(camera, from, to)
     push!(scene, camera)
 
-    origin = zeros(Float32, 3)
     R = 1.0f0
-    push!(scene, Rays.Cube(origin, R))
+    push!(scene, Rays.Cube(R))
 
     Rays.set_dropoff_curve_default!(scene, camera)
 

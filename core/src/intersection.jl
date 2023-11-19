@@ -4,7 +4,11 @@ with a shape.
 Intersections should only contain one value per field, but they are vectors to make them mutable.
 """
 struct Intersection{F<:AbstractFloat}
+    # A ray as it comes from the camera
+    ray_camera::Ray{F}
+    # A ray as affine transformed for a shape
     ray::Ray{F}
+    # Rays used for fractalshape intersections
     rays_transformed::Vector{Ray{F}}
     t::Vector{F}
     # For cube intersections
@@ -29,8 +33,9 @@ a certain shape for when there is no intersection.
 """
 function Intersection(; F = Float32)::Intersection
     return Intersection(
+        Ray(; F), # ray_camera
         Ray(; F), # ray
-        Ray{F}[],
+        Ray{F}[], # rays_transformed
         [F(Inf)], # t 
         [0], # dim 
         zeros(F, 3), # u

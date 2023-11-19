@@ -53,7 +53,7 @@ end
 construct a Menger sponge of given location, size and recursion depth,
 with the subshapes array automatically generated.
 """
-function menger_sponge(R::AbstractFloat, depth::Int)::FractalShape{F,Cube{F}} where {F}
+function menger_sponge(R::F, depth::Int)::FractalShape{F,Cube{F}} where {F}
     subcubes = Cube{F}[]
     R_subcube = R / 3
     R_subcube = convert(F, R_subcube)
@@ -152,10 +152,7 @@ end
 Construct a Sierpinski pyramid of given location, size and recursion depth,
 with the subshapes array automatically generated.
 """
-function sierpinski_pyramid(
-    R::AbstractFloat,
-    depth::Int,
-)::FractalShape{F,TriangleShape{F}} where {F}
+function sierpinski_pyramid(R::F, depth::Int)::FractalShape{F,TriangleShape{F}} where {F}
     subtetrahedra = TriangleShape{F}[]
     R_subtetrahedron = convert(F, R / 2)
 

@@ -4,32 +4,32 @@ using Accessors: @set
 using LinearAlgebra: normalize!, norm
 
 @testset "Sphere" begin
-    center = ones(3)
     R = 0.5
-    sphere = Rays.Sphere(center, R)
+    sphere = Rays.Sphere(R)
     @test sphere isa Rays.Sphere
     @test string(sphere) == "<Sphere 'sphere'>"
 
     intersection = Rays.Intersection(; F = Float64)
-    (; ray) = intersection
-    ray.loc .= 0.0
-    ray.dir .= 1.0
-    normalize!(ray.dir)
-    closer_intersection_found = Rays._intersect_ray!(intersection, sphere)
-    @test closer_intersection_found
+    (; ray_camera) = intersection
+    ray_camera.loc .= 0.0
+    ray_camera.dir .= 1.0
+    normalize!(ray_camera.dir)
+    translation = Rays.get_translation(ones(3))
+    intersector! = Rays.create_intersector(sphere, translation)
+    intersector!(intersection)
+    @test intersection.name_intersected[1] == :sphere
     @test intersection.t[1] ≈ sqrt(3) - 0.5
 
     Rays.reset_intersection!(intersection)
-    ray.dir .= [0.0, 0.0, 1.0]
-    closer_intersection_found = Rays._intersect_ray!(intersection, sphere)
-    @test !closer_intersection_found
+    ray_camera.dir .= [0.0, 0.0, 1.0]
+    intersector!(intersection)
+    @test intersection.name_intersected[1] == :none
     @test intersection.t[1] == Inf
 end
 
 @testset "Cube" begin
-    center = [0.0, 2.0, 0.0]
     R = 0.5
-    cube = Rays.Cube(center, R)
+    cube = Rays.Cube(R)
     cube = @set cube.name = :my_awesome_cube
 
     @test cube isa Rays.Cube
@@ -48,9 +48,8 @@ end
 end
 
 @testset "FractalShape" begin
-    center = zeros(3)
     R = 0.5
-    sponge = Rays.menger_sponge(center, R, 4)
+    sponge = Rays.menger_sponge(R, 4)
     sponge = @set sponge.name = :my_awesome_sponge
 
     @test sponge isa Rays.FractalShape
@@ -70,12 +69,11 @@ end
 end
 
 @testset "ImplicitSurface" begin
-    center = zeros(3)
     R = 0.5
     function f(x)
         return norm(x) - R
     end
-    sphere = Rays.ImplicitSurface(f, center, name = :sphere, R_bound = 1.1 * R, tol = 1e-5)
+    sphere = Rays.ImplicitSurface(f, name = :sphere, R_bound = 1.1 * R, tol = 1e-5)
     @test sphere isa Rays.ImplicitSurface
     @test string(sphere) ==
           "<ImplicitSurface 'sphere'; function 'f' and finite difference gradient>"
@@ -97,10 +95,9 @@ end
 end
 
 @testset "TriangleShape" begin
-    center = zeros(3)
     vertices = [0.0 0.0 0.0; 1.0 0.0 0.0; 0.0 1.0 0.0]
     faces = [1 2 3;]
-    triangle = Rays.TriangleShape(vertices, faces, center; name = :my_awesome_triangle)
+    triangle = Rays.TriangleShape(vertices, faces; name = :my_awesome_triangle)
     @test string(triangle) ==
           "<TriangleShape 'my_awesome_triangle'; with 3 vertices and 1 faces>"
 
@@ -119,10 +116,9 @@ end
 end
 
 @testset "RevolutionSurface" begin
-    center = zeros(3)
     r(z) = z^2
     revolution_shape =
-        Rays.RevolutionSurface(r, 1.0, -1.0, 1.0, center; tol = 1e-7, n_divisions = 50)
+        Rays.RevolutionSurface(r, 1.0, -1.0, 1.0; tol = 1e-7, n_divisions = 50)
     @test string(revolution_shape) ==
           "<RevolutionSurface 'revolution_surface'; function 'r' and finite difference derivative>"
 
