@@ -137,6 +137,8 @@ end
 	R = 1.0f0
 	push!(scene, Rays.Cube(origin, R))
 
+	Rays.set_dropoff_curve_default!(scene, camera)
+
 	julia_green = Float32[0.22, 0.596, 0.149]
 	julia_purple = Float32[0.584, 0.345, 0.698]
 	julia_red = Float32[0.796, 0.235, 0.2]
@@ -144,8 +146,7 @@ end
 
 	function colorfield!(color::Vector{Float32}, loc_int::Vector{Float32})::Nothing
 		for i ∈ 1:3
-			color[i] =
-				min(2 * sqrt(2) * abs(loc_int[i]), 1.0f0)
+			color[i] = min(2 * sqrt(2) * abs(loc_int[i]), 1.0f0)
 		end
 		return nothing
 	end
@@ -165,12 +166,7 @@ end
 	Rays.set_texture!(scene, :cube, Rays.UniformTexture(Float32[0.0, 1.0, 0.0]))
 	Rays.render!(scene)
 	@test camera.canvas ≈ reshape(
-		readdlm(
-			normpath(@__DIR__, "files/uniform_texture_render.csv"),
-			',',
-			Float32,
-			'\n',
-		),
+		readdlm(normpath(@__DIR__, "files/uniform_texture_render.csv"), ',', Float32, '\n'),
 		size(camera.canvas),
 	)
 
