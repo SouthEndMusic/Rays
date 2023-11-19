@@ -2,12 +2,11 @@ abstract type Shape{F<:AbstractFloat} end
 
 struct Sphere{F} <: Shape{F}
     name::Symbol
-    center::Vector{F}
     R::F
     Rsq::F
 end
 
-Sphere(center::Vector{F}, R::F) where {F} = Sphere(snake_case_name(Sphere), center, R, R^2)
+Sphere(R::F) where {F} = Sphere(snake_case_name(Sphere), R, R^2)
 
 function Base.show(io::IO, sphere::Sphere)::Nothing
     (; name) = sphere
@@ -17,11 +16,10 @@ end
 
 struct Cube{F} <: Shape{F}
     name::Symbol
-    center::Vector{F}
     R::F
 end
 
-Cube(center::Vector{F}, R::F) where {F} = Cube(snake_case_name(Cube), center, R)
+Cube(center::Vector{F}, R::F) where {F} = Cube(snake_case_name(Cube), R)
 
 function Base.show(io::IO, cube::Cube)::Nothing
     (; name) = cube
@@ -32,14 +30,12 @@ end
 """
 A shape where each subshape is substituted by a shrinked
 version of the whole, up to a certain recursion depth.
-center: the center of the shape
 depth: the maximal recursion depth
 shrink_factor: the factor by which all lengths decrease for a substitution
 subshapes: the set of shapes that a shape is substituted with for a recursion step
 """
 struct FractalShape{F,S<:Shape{F}} <: Shape{F}
     name::Symbol
-    center::Vector{F}
     depth::Int
     shrink_factor::F
     subshapes::Vector{S}
@@ -57,11 +53,7 @@ end
 construct a Menger sponge of given location, size and recursion depth,
 with the subshapes array automatically generated.
 """
-function menger_sponge(
-    center::Vector{F},
-    R::AbstractFloat,
-    depth::Int,
-)::FractalShape{F,Cube{F}} where {F}
+function menger_sponge(R::AbstractFloat, depth::Int)::FractalShape{F,Cube{F}} where {F}
     subcubes = Cube{F}[]
     R_subcube = R / 3
     R_subcube = convert(F, R_subcube)
@@ -73,13 +65,13 @@ function menger_sponge(
         if count(x -> x == 2, ordinals) > 1
             continue
         end
-        center_subcube = @. center + (ordinals - 2) * 2 * R_subcube
+        center_subcube = (ordinals - 2) * 2 * R_subcube
         center_subcube = convert(Vector{F}, center_subcube)
 
-        subcube = Cube(Symbol("subcube_$i"), center_subcube, R_subcube)
+        subcube = Cube(Symbol("subcube_$i"), R_subcube)
         push!(subcubes, subcube)
     end
-    return FractalShape{F,Cube{F}}(:menger_sponge, center, depth, 3.0, subcubes)
+    return FractalShape{F,Cube{F}}(:menger_sponge, depth, 3.0, subcubes)
 end
 
 """
@@ -87,7 +79,6 @@ A shape consisting of triangles.
 vertices: A n_vertices x 3 matrix of vertices
 faces: A n_faces x 3 matrix of faces. Each face is defined 
 	by the indices of 3 vertices.
-center: The center of the shape
 n_vertices: The number of vertices
 n_faces: the number of faces
 convex: Whether the triangles enclose a convex volume.
@@ -97,7 +88,6 @@ struct TriangleShape{F} <: Shape{F}
     vertices::Matrix{F} # (n_vertices, 3)
     faces::Matrix{Int} # (n_faces, 3)
     normals::Matrix{F} # (n_faces, 3)
-    center::Vector{F}
     n_vertices::Int
     n_faces::Int
     convex::Bool
@@ -109,7 +99,6 @@ Construct a triangle shape where the normals are computed automatically from the
 function TriangleShape(
     vertices::Matrix{F},
     faces::Matrix{Int},
-    center::Vector{F};
     convex::Bool = false,
     name::Union{Symbol,Nothing} = nothing,
 )::TriangleShape{F} where {F}
@@ -129,16 +118,7 @@ function TriangleShape(
         name = snake_case_name(TriangleShape)
     end
 
-    return TriangleShape(
-        name,
-        vertices,
-        faces,
-        normals,
-        center,
-        n_vertices,
-        n_faces,
-        convex,
-    )
+    return TriangleShape(name, vertices, faces, normals, n_vertices, n_faces, convex)
 end
 
 function Base.show(io::IO, triangle_shape::TriangleShape)::Nothing
@@ -148,15 +128,15 @@ function Base.show(io::IO, triangle_shape::TriangleShape)::Nothing
 end
 
 """
-Construct a tetrahedron as a triangle shape with given center and radius.
+Construct a tetrahedron as a triangle shape with given radius.
 """
-function Tetrahedron(center::Vector{F}, R::F)::TriangleShape{F} where {F}
+function Tetrahedron(R::F)::TriangleShape{F} where {F}
     vertices = zeros(F, 4, 3)
-    vertices[4, :] .= center + [0.0, 0.0, R]
+    vertices[4, :] .= [0.0, 0.0, R]
 
     ϕ = 2π / 3
     for (i, θ) in enumerate(range(0, 2π, 4)[1:end-1])
-        @. vertices[i, :] = center + R * [
+        @. vertices[i, :] = R * [
             cos(θ) * sin(ϕ)
             sin(θ) * sin(ϕ)
             cos(ϕ)
@@ -165,7 +145,7 @@ function Tetrahedron(center::Vector{F}, R::F)::TriangleShape{F} where {F}
 
     faces = [1 2 3; 1 2 4; 1 3 4; 2 3 4]
 
-    return TriangleShape(vertices, faces, center; convex = true, name = :tetrahedron)
+    return TriangleShape(vertices, faces; convex = true, name = :tetrahedron)
 end
 
 """
@@ -173,29 +153,19 @@ Construct a Sierpinski pyramid of given location, size and recursion depth,
 with the subshapes array automatically generated.
 """
 function sierpinski_pyramid(
-    center::Vector{F},
     R::AbstractFloat,
     depth::Int,
 )::FractalShape{F,TriangleShape{F}} where {F}
     subtetrahedra = TriangleShape{F}[]
     R_subtetrahedron = convert(F, R / 2)
 
-    tetrahedron_main = Tetrahedron(center, R)
+    tetrahedron_main = Tetrahedron(R)
     for i ∈ 1:4
-        subtetrahedron =
-            Tetrahedron(center + tetrahedron_main.vertices[i, :] / 2, R_subtetrahedron)
+        subtetrahedron = Tetrahedron(R_subtetrahedron)
         push!(subtetrahedra, subtetrahedron)
     end
 
-    return FractalShape(:sierpinski_pyramid, center, depth, convert(F, 2.0), subtetrahedra)
-end
-
-"""
-Create a new instance of the same shape with a different name
-"""
-function set_name(shape::S, name_new::Symbol)::S where {S<:Shape}
-    fields = [name == :name ? name_new : getfield(shape, name) for name in fieldnames(S)]
-    return S(fields...)
+    return FractalShape(:sierpinski_pyramid, depth, convert(F, 2.0), subtetrahedra)
 end
 
 """
@@ -206,7 +176,6 @@ Note: the function f must change sign across the level 0 set
 to be detected propery.
 
 name: The name of the same
-center: The center of the shape
 f: The scalar field function
 ∇f!: The (in place) gradient function of f. If not provided,
 	finite difference gradients are used
@@ -221,7 +190,6 @@ itermax: The maximum amount of Newton iterations used to find
 """
 struct ImplicitSurface{F,VF<:Union{VectorField{F},Nothing}} <: Shape{F}
     name::Symbol
-    center::Vector{F}
     f::ScalarField{F}
     ∇f!::VF
     R_bound::F
@@ -236,7 +204,6 @@ parameters.
 """
 function ImplicitSurface(
     f::Function,
-    center::Vector{F};
     ∇f!::Union{Function,Nothing} = nothing,
     R_bound::Union{F,Nothing} = nothing,
     name::Union{Symbol,Nothing} = nothing,
@@ -247,9 +214,6 @@ function ImplicitSurface(
     if isnothing(name)
         name = snake_case_name(ImplicitSurface)
     end
-    if isnothing(center)
-        center = zeros(F, 3)
-    end
     if isnothing(R_bound)
         R_bound = convert(F, 2.0)
     end
@@ -259,7 +223,6 @@ function ImplicitSurface(
 
     return ImplicitSurface(
         name,
-        center,
         ScalarField{F}(f),
         isnothing(∇f!) ? nothing : VectorField{F}(∇f!),
         R_bound,
@@ -282,7 +245,6 @@ A shape defined as the points a distance r(z) from the z-axis,
 with closing disks at z_min and z_max.
 
 name: The name of the shape
-center: The center of the shape
 r: The distance function from the z-axis
 dr: The derivative of r. If not provided, 
 	a finite difference derivative is used
@@ -298,7 +260,6 @@ itermax: The maximum amount of Newton iterations used to find
 """
 struct RevolutionSurface{F,SF<:Union{ScalarFunc{F},Nothing}} <: Shape{F}
     name::Symbol
-    center::Vector{F}
     r::ScalarFunc{F}
     dr::SF
     r_max::F
@@ -318,7 +279,6 @@ function RevolutionSurface(
     r_max::F,
     z_min::F,
     z_max::F,
-    center::Vector{F};
     dr::Union{Function,Nothing} = nothing,
     name::Union{Symbol,Nothing} = nothing,
     itermax::Int = 10,
@@ -333,7 +293,6 @@ function RevolutionSurface(
     end
     return RevolutionSurface(
         name,
-        center,
         ScalarFunc{F}(r),
         isnothing(dr) ? nothing : ScalarFunc{F}(dr),
         r_max,

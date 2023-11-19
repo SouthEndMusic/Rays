@@ -60,15 +60,12 @@ Returns (nothing, nothing) if the intersections do not exist.
 """
 function intersect_sphere(
     ray::Ray{F},
-    center::Vector{F},
     Rsq::F,
 )::Tuple{Union{F,Nothing},Union{F,Nothing}} where {F}
     (; loc, dir) = ray
-
-    diff = loc - center
     a = norm(dir)^2
-    b = 2 * dot(dir, diff)
-    c = norm(diff)^2 - Rsq
+    b = 2 * dot(dir, loc)
+    c = norm(loc)^2 - Rsq
     discr = b^2 - 4 * a * c
 
     if discr >= 0
@@ -89,8 +86,8 @@ real solution to a quadratic polynomial, if it exists.
 """
 function _intersect_ray!(intersection::Intersection{F}, sphere::Sphere)::Bool where {F}
     (; ray) = intersection
-    (; center, Rsq) = sphere
-    t_int_candidate = intersect_sphere(ray, center, Rsq)[1]
+    (; Rsq) = sphere
+    t_int_candidate = intersect_sphere(ray, Rsq)[1]
 
     closer_intersection_found = false
 
@@ -114,8 +111,7 @@ function _intersect_ray!(intersection::Intersection{F}, cube::Cube{F})::Bool whe
     closer_intersection_found = false
 
     for dim ∈ 1:3
-        bound_small = cube.center[dim] - cube.R
-        diff_bound_small = bound_small - ray.loc[dim]
+        diff_bound_small = -cube.R - ray.loc[dim]
         dir_dim_positive = (ray.dir[dim] > 0) # dir_dim = 0 not taken into account
 
         if diff_bound_small > 0.0
@@ -125,8 +121,7 @@ function _intersect_ray!(intersection::Intersection{F}, cube::Cube{F})::Bool whe
                 return closer_intersection_found
             end
         else
-            bound_big = cube.center[dim] + cube.R
-            diff_bound_big = bound_big - ray.loc[dim]
+            diff_bound_big = cube.R - ray.loc[dim]
 
             if diff_bound_big > 0.0
                 if dir_dim_positive
@@ -153,10 +148,10 @@ function _intersect_ray!(intersection::Intersection{F}, cube::Cube{F})::Bool whe
                 if other_dim !== dim
                     loc_int_other_dim_1 =
                         ray.loc[other_dim] + t_int_candidate * ray.dir[other_dim]
-                    if loc_int_other_dim_1 > cube.center[other_dim] + cube.R
+                    if loc_int_other_dim_1 > cube.R
                         candidate = false
                         continue
-                    elseif loc_int_other_dim_1 < cube.center[other_dim] - cube.R
+                    elseif loc_int_other_dim_1 < -cube.R
                         candidate = false
                         continue
                     end
@@ -213,8 +208,6 @@ function _intersect_ray!(
             reset_intersection!(intersection)
             ray_transformed = intersection.rays_transformed[current_depth+1]
             ray_transformed.loc .= ray.loc
-            ray_transformed.loc .+= fractal_shape.center
-            ray_transformed.loc .-= subshape_intersect.center
             ray_transformed.loc .*= shrink_factor
 
             intersection.t[1] *= shrink_factor
@@ -363,10 +356,10 @@ function _intersect_ray!(
 )::Bool where {F}
     (; loc_int, ray, grad) = intersection
     (; loc, dir) = ray
-    (; f, ∇f!, itermax, tol, center, R_bound, n_divisions) = shape
+    (; f, ∇f!, itermax, tol, R_bound, n_divisions) = shape
 
     # Compute intersections of the ray with the bounding sphere
-    bound_lower, bound_upper = intersect_sphere(ray, center, R_bound^2)
+    bound_lower, bound_upper = intersect_sphere(ray, R_bound^2)
 
     # If there are no intersections with the bounding sphere,
     # there are certainly no intersections with the implicit surface
