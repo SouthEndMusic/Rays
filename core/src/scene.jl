@@ -70,12 +70,15 @@ end
 
 """
 Add a camera to the scene.
+If replace = false, a new name with suffix _i is generated for the camera
+with i the smallest integer such that the new name is unique in the scene.
+NOTE: This creates a new camera instance which is returned by this function.
 """
 function Base.push!(
     scene::Scene{F},
     camera::Camera{F};
     replace::Bool = false,
-)::Nothing where {F}
+)::Camera{F} where {F}
     name = camera.name
     if !replace && name_exists(scene, name)
         name_new = unique_name(name, scene)
@@ -84,7 +87,7 @@ function Base.push!(
         name = name_new
     end
     scene.cameras[name] = camera
-    return nothing
+    return camera
 end
 
 """
@@ -118,14 +121,18 @@ function set_texture!(
 end
 
 """
-Add a shape to the scene.
+Add a shape to the scene. Features:
+- If replace = false, a new name with suffix _i is generated for the shape
+  with i the smallest integer such that the new name is unique in the scene.
+  NOTE: This creates a new shape instance which is returned by this function.
+- If no texture is given, a default uniform white texture is assigned
 """
 function Base.push!(
     scene::Scene{F},
     shape::Shape{F};
     replace::Bool = false,
     texture::Union{Texture{F},Nothing} = nothing,
-)::Nothing where {F}
+)::Shape{F} where {F}
     ## Name
     name = shape.name
     if !replace && name_exists(scene, name)
@@ -148,5 +155,5 @@ function Base.push!(
     end
     set_texture!(scene, name, texture)
 
-    return nothing
+    return shape
 end

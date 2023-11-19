@@ -116,6 +116,11 @@ function add_depth_of_field!(camera::Camera{F})::Nothing where {F}
     return nothing
 end
 
+"""
+Multiply the shade of the canvas by the color given by
+the texture of the intersected shape.
+If no intersection was found, set the color to black.
+"""
 function set_color!(
     camera::Camera{F},
     intersection::Intersection{F},
