@@ -19,7 +19,7 @@ struct Cube{F} <: Shape{F}
     R::F
 end
 
-Cube(center::Vector{F}, R::F) where {F} = Cube(snake_case_name(Cube), R)
+Cube(R::F) where {F} = Cube(snake_case_name(Cube), R)
 
 function Base.show(io::IO, cube::Cube)::Nothing
     (; name) = cube
@@ -98,7 +98,7 @@ Construct a triangle shape where the normals are computed automatically from the
 """
 function TriangleShape(
     vertices::Matrix{F},
-    faces::Matrix{Int},
+    faces::Matrix{Int};
     convex::Bool = false,
     name::Union{Symbol,Nothing} = nothing,
 )::TriangleShape{F} where {F}
@@ -200,7 +200,7 @@ Construct an implicit surface with optional rootfinding
 parameters.
 """
 function ImplicitSurface(
-    f::Function,
+    f::Function;
     ∇f!::Union{Function,Nothing} = nothing,
     R_bound::Union{F,Nothing} = nothing,
     name::Union{Symbol,Nothing} = nothing,
@@ -275,7 +275,7 @@ function RevolutionSurface(
     r::Function,
     r_max::F,
     z_min::F,
-    z_max::F,
+    z_max::F;
     dr::Union{Function,Nothing} = nothing,
     name::Union{Symbol,Nothing} = nothing,
     itermax::Int = 10,

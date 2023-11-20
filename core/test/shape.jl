@@ -14,7 +14,7 @@ using LinearAlgebra: normalize!, norm
     ray_camera.loc .= 0.0
     ray_camera.dir .= 1.0
     normalize!(ray_camera.dir)
-    translation = Rays.get_translation(ones(3))
+    translation = Rays.translation(ones(3))
     intersector! = Rays.create_intersector(sphere, translation)
     intersector!(intersection)
     @test intersection.name_intersected[1] == :sphere
@@ -36,13 +36,15 @@ end
     @test string(cube) == "<Cube 'my_awesome_cube'>"
 
     intersection = Rays.Intersection(; F = Float64)
-    (; ray) = intersection
-    ray.loc .= 0.0
-    ray.dir .= [0.0, 1.0, 0.0]
-    normalize!(ray.dir)
+    (; ray_camera) = intersection
+    ray_camera.loc .= 0.0
+    ray_camera.dir .= [0.0, 1.0, 0.0]
+    normalize!(ray_camera.dir)
+    translation = Rays.translation([0.0, 2.0, 0.0])
+    intersector! = Rays.create_intersector(cube, translation)
 
-    closer_intersection_found = Rays._intersect_ray!(intersection, cube)
-    @test closer_intersection_found
+    intersector!(intersection)
+    @test intersection.name_intersected[1] == :my_awesome_cube
     @test intersection.t[1] ≈ 1.5
     @test intersection.dim[1] == 2
 end

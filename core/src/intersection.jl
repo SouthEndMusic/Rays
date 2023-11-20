@@ -543,3 +543,14 @@ function _intersect_ray!(
 
     return closer_intersection_found
 end
+
+function transform_t(
+    intersection::Intersection{F},
+    transform::AffineTransform{F},
+)::F where {F}
+    t = intersection.t[1]
+    if !isnothing(transform.scaling)
+        t *= transform.scaling
+    end
+    return t
+end

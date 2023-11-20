@@ -1,34 +1,43 @@
-abstract type AffineTransform{F<:AbstractFloat} end
+abstract type RayTransform{F <: AbstractFloat} end
 
-struct IdentityTransform{F} <: AffineTransform{F} end
-
-struct Translation{F<:AbstractFloat} <: AffineTransform{F}
-    vector_back::Vector{F}
+struct AffineTransform{
+	F <: Union{AbstractFloat, Nothing},
+	S <: Union{F, Nothing},
+	R <: Union{Matrix{F}, Nothing},
+	T <: Union{Vector{F}, Nothing},
+} <: RayTransform{F}
+	scaling::S
+	rotation::R
+	rotation_inverse::R
+	translation::T
 end
 
-function get_translation(vector::Vector{F})::Translation{F} where {F}
-    return Translation(-vector)
+function identity_transform(F)::AffineTransform{F, Nothing, Nothing, Nothing}
+	return AffineTransform{F, Nothing, Nothing, Nothing}(nothing, nothing, nothing, nothing)
 end
 
-function affine_transform!(
-    ray::Ray{F},
-    ray_camera::Ray{F},
-    transform::IdentityTransform,
+function translation(vector::Vector{F})::AffineTransform{F} where {F}
+	return AffineTransform(nothing, nothing, nothing, vector)
+end
+
+function inverse_transform!(
+	ray::Ray{F},
+	ray_camera::Ray{F},
+	transform::AffineTransform{F},
 )::Nothing where {F}
-    ray.loc .= view(ray_camera.loc, :)
-    ray.dir .= view(ray_camera.loc, :)
-    return nothing
+	(; scaling, rotation_inverse, translation) = transform
+	ray.loc .= view(ray_camera.loc, :)
+	ray.dir .= view(ray_camera.dir, :)
+
+	if !isnothing(translation)
+		ray.loc .-= view(translation, :)
+	end
+	if !isnothing(scaling)
+		ray.loc ./= scaling
+	end
+	if !isnothing(rotation_inverse)
+		ray.loc .= rotation_inverse * ray.loc
+		ray.dir .= rotation_inverse * ray.dir
+	end
+	return nothing
 end
-
-function affine_transform!(
-    ray::Ray{F},
-    ray_camera::Ray{F},
-    transform::Translation{F},
-)::Nothing where {F}
-    ray.loc .= view(ray_camera.loc, :)
-    ray.loc .+= view(transform.vector_back, :)
-    ray.dir .= view(ray_camera.dir, :)
-    return nothing
-end
-
-
