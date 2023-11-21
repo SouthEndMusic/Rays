@@ -1,13 +1,16 @@
 const Intersector = FunctionWrapper{Nothing,Tuple{Intersection{F}}} where {F}
 const Texturer = FunctionWrapper{Nothing,Tuple{Intersection{F}}} where {F}
 
-
 """
 Object for holding the data of all cameras and shapes in a scene.
 """
 struct Scene{F<:AbstractFloat}
     cameras::Dict{Symbol,Camera{F}}
+    # Heterogenous values: slow
     shapes::Dict{Symbol,Shape{F}}
+    textures::Dict{Symbol,Texture{F}}
+    transforms::Dict{Symbol,AffineTransform{F}}
+    # Fully typed wrapped functions: fast
     intersectors::Dict{Symbol,Intersector{F}}
     texturers::Dict{Symbol,Texturer{F}}
 end
@@ -29,6 +32,7 @@ Remove all shapes from the scene.
 """
 function clear_shapes!(scene::Scene)::Nothing
     empty!(scene.shapes)
+    empty!(scene.transforms)
     empty!(scene.intersectors)
     empty!(scene.texturers)
     return nothing
@@ -43,6 +47,14 @@ function Base.show(io::IO, scene::Scene)::Nothing
     println(io, "\n* Shapes:")
     for shape in values(scene.shapes)
         println(io, "\t", shape)
+    end
+    println(io, "\n* Transforms:")
+    for (name, transform) in scene.transforms
+        println(io, "\t", name, ": ", transform)
+    end
+    println(io, "\n* Textures:")
+    for (name, texture) in scene.textures
+        println(io, "\t", name, ": ", texture)
     end
 end
 
@@ -129,6 +141,7 @@ function set_texture!(
     if !haskey(scene.shapes, shape_name)
         error("Scene contains no shape with name \'$shape_name\'.")
     end
+    scene.textures[shape_name] = texture
     scene.texturers[shape_name] = create_texturer(texture)
     return nothing
 end
@@ -161,10 +174,9 @@ function Base.push!(
     if isnothing(transform)
         transform = identity_transform(F)
     end
+    scene.transforms[name] = transform
     # Define intersector for this shape
     scene.intersectors[name] = create_intersector(shape, transform)
-    # Call the intersector once
-    scene.intersectors[name](Intersection(; F))
 
     ## Texturer
     if isnothing(texture)
@@ -189,4 +201,5 @@ function set_transform!(
     end
     shape = scene.shapes[shape_name]
     scene.intersectors[shape_name] = create_intersector(shape, transform)
+    return nothing
 end

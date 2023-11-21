@@ -34,11 +34,11 @@ depth: the maximal recursion depth
 shrink_factor: the factor by which all lengths decrease for a substitution
 subshapes: the set of shapes that a shape is substituted with for a recursion step
 """
-struct FractalShape{F,S<:Shape{F}} <: Shape{F}
+struct FractalShape{F,S<:Shape{F},T<:RayTransform{F}} <: Shape{F}
     name::Symbol
     depth::Int
-    shrink_factor::F
-    subshapes::Vector{S}
+    shape::S
+    subshape_transforms::Vector{T}
 end
 
 function Base.show(io::IO, fractal_shape::FractalShape)::Nothing
@@ -53,25 +53,27 @@ end
 construct a Menger sponge of given location, size and recursion depth,
 with the subshapes array automatically generated.
 """
-function menger_sponge(R::F, depth::Int)::FractalShape{F,Cube{F}} where {F}
-    subcubes = Cube{F}[]
+function menger_sponge(
+    R::F,
+    depth::Int,
+)::FractalShape{F,Cube{F},AffineTransform{F,F,Nothing,Vector{F}}} where {F}
+    subcube_transforms = AffineTransform{F,F,Nothing,Vector{F}}[]
     R_subcube = R / 3
-    R_subcube = convert(F, R_subcube)
-    i = 0
 
     for ordinals in Iterators.product(1:3, 1:3, 1:3)
-        i += 1
         ordinals = collect(ordinals)
         if count(x -> x == 2, ordinals) > 1
             continue
         end
-        center_subcube = (ordinals - 2) * 2 * R_subcube
+        center_subcube = (ordinals .- 2) * 2 * R_subcube
         center_subcube = convert(Vector{F}, center_subcube)
 
-        subcube = Cube(Symbol("subcube_$i"), R_subcube)
-        push!(subcubes, subcube)
+        push!(
+            subcube_transforms,
+            AffineTransform(F(1 / 3), nothing, nothing, center_subcube),
+        )
     end
-    return FractalShape{F,Cube{F}}(:menger_sponge, depth, 3.0, subcubes)
+    return FractalShape(:menger_sponge, depth, Cube(R), subcube_transforms)
 end
 
 """

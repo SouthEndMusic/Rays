@@ -12,8 +12,9 @@ function set_dropoff_curve_default!(scene::Scene{F}, camera::Camera{F})::Camera{
     end
     dist_max = zero(F)
 
-    for shape in values(scene.shapes)
-        dist_max = max(dist_max, norm(camera.loc - shape.center))
+    for transform in values(scene.transforms)
+        center = isnothing(transform.translation) ? zeros(F, 3) : transform.translation
+        dist_max = max(dist_max, norm(camera.loc - center))
     end
     dropoff_curve =
         ScalarFunc{F}(t -> max(zero(F), one(F) - t / (convert(F, 1.5) * dist_max)))

@@ -16,7 +16,7 @@ const VectorField =
 
 include("utils.jl")
 include("camera.jl")
-include("transforms.jl")
+include("transform.jl")
 include("shape.jl")
 include("intersection.jl")
 include("texture.jl")
