@@ -56,7 +56,7 @@ end
 
     @test sponge isa Rays.FractalShape
     @test string(sponge) ==
-          "<FractalShape 'my_awesome_sponge'; 20 subshapes of type Rays.Cube{Float64}>"
+          "<FractalShape 'my_awesome_sponge'; 20 subshapes of <Cube 'cube'>>"
 
     intersection = Rays.Intersection(; F = Float64)
     (; ray) = intersection

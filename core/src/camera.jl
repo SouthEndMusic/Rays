@@ -142,7 +142,7 @@ function look_at!(
 )::Nothing where {F}
     (; loc, dir, up, right) = camera
 
-    loc .= from
+    copyto!(loc, from)
     dir .= normalize(to - from)
 
     dir_z = dir[3]

@@ -85,7 +85,7 @@ Compute a render and put it to the SDL window.
 function set_render!(interactor::Interactor)::Nothing
     (; renderer, scene, parameters, get_render, render_UInt8, camera_main) = interactor
     canvas = camera_main.canvas
-    canvas .= get_render(scene, parameters)
+    copyto!(canvas, get_render(scene, parameters))
     render_UInt8 .= convert.(UInt8, round.(255 .* canvas))
     render = permutedims(render_UInt8, [1, 3, 2])
     depth = 24

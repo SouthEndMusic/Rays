@@ -42,10 +42,10 @@ struct FractalShape{F,S<:Shape{F},T<:RayTransform{F}} <: Shape{F}
 end
 
 function Base.show(io::IO, fractal_shape::FractalShape)::Nothing
-    (; name, subshapes) = fractal_shape
+    (; name, subshape_transforms, shape) = fractal_shape
     print(
         io,
-        "<FractalShape \'$name\'; $(length(subshapes)) subshapes of type $(eltype(subshapes))>",
+        "<FractalShape \'$name\'; $(length(subshape_transforms)) subshapes of $shape>",
     )
 end
 
