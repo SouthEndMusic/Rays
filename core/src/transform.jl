@@ -26,15 +26,19 @@ function forward_transform!(
     transform::AffineTransform{F},
 )::Nothing where {F}
     (; scaling, rotation, translation) = transform
-    copyto!(ray_dst.loc, ray_src.loc)
-    copyto!(ray_dst.dir, ray_src.dir)
+    if ray_src !== ray_dst
+        copyto!(ray_dst.loc, ray_src.loc)
+        copyto!(ray_dst.dir, ray_src.dir)
+    end
 
     if !isnothing(rotation)
         ray_dst.loc .= rotation * ray_dst.loc
         ray_dst.dir .= rotation * ray_dst.dir
     end
     if !isnothing(scaling)
-        ray_dst.loc .*= scaling
+        for i = 1:3
+            ray_dst.loc[i] *= scaling
+        end
     end
     if !isnothing(translation)
         ray_dst.loc .+= view(translation, :)
@@ -48,14 +52,18 @@ function inverse_transform!(
     transform::AffineTransform{F},
 )::Nothing where {F}
     (; scaling, rotation_inverse, translation) = transform
-    copyto!(ray_dst.loc, ray_src.loc)
-    copyto!(ray_dst.dir, ray_src.dir)
+    if ray_src !== ray_dst
+        copyto!(ray_dst.loc, ray_src.loc)
+        copyto!(ray_dst.dir, ray_src.dir)
+    end
 
     if !isnothing(translation)
         ray_dst.loc .-= view(translation, :)
     end
     if !isnothing(scaling)
-        ray_dst.loc ./= scaling
+        for i = 1:3
+            ray_dst.loc[i] /= scaling
+        end
     end
     if !isnothing(rotation_inverse)
         ray_dst.loc .= rotation_inverse * ray_dst.loc

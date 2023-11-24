@@ -155,16 +155,16 @@ Construct a Sierpinski pyramid of given location, size and recursion depth,
 with the subshapes array automatically generated.
 """
 function sierpinski_pyramid(R::F, depth::Int)::FractalShape{F,TriangleShape{F}} where {F}
-    subtetrahedra = TriangleShape{F}[]
-    R_subtetrahedron = convert(F, R / 2)
-
-    tetrahedron_main = Tetrahedron(R)
+    subtetrahedron_transforms = AffineTransform{F,F,Nothing,Vector{F}}[]
+    tetrahedron = Tetrahedron(R)
     for i ∈ 1:4
-        subtetrahedron = Tetrahedron(R_subtetrahedron)
-        push!(subtetrahedra, subtetrahedron)
+        center_subtetrahedron = tetrahedron.vertices[i, :] / 2
+        subtetrahedron_transform =
+            AffineTransform(F(1 / 2), nothing, nothing, center_subtetrahedron)
+        push!(subtetrahedron_transforms, subtetrahedron_transform)
     end
 
-    return FractalShape(:sierpinski_pyramid, depth, convert(F, 2.0), subtetrahedra)
+    return FractalShape(:sierpinski_pyramid, depth, tetrahedron, subtetrahedron_transforms)
 end
 
 """

@@ -1,5 +1,3 @@
-(x::F ≲ y::F) where {F<:AbstractFloat} = (x < y) || (x ≈ y)
-
 """
 Object that holds all information of the intersection of a ray
 with a shape.
@@ -146,7 +144,7 @@ function _intersect_ray!(intersection::Intersection{F}, cube::Cube{F})::Bool whe
             end
         end
 
-        if t_int_candidate ≲ intersection.t[1]
+        if t_int_candidate < intersection.t[1]
             other_dim = 0
             candidate = true
 
@@ -184,6 +182,7 @@ function _intersect_ray!(
     (; ray) = intersection
     (; depth, shape, subshape_transforms) = fractal_shape
     closer_intersection_found = false
+    reset_intersection!(intersection)
 
     for subshape_transform in subshape_transforms
         intersection.t[1] /= subshape_transform.scaling
@@ -206,76 +205,6 @@ function _intersect_ray!(
     end
     return closer_intersection_found
 end
-
-# """
-# Compute the intersection of a ray with a fractal shape.
-# This is done recursively until the recursion depth of the fractal shape.
-# To compute the intersection of a ray with a subshape, the ray location is transformed.
-# """
-# function _intersect_ray!(
-# 	intersection::Intersection{F},
-# 	fractal_shape::FractalShape{F, S};
-# 	current_depth::Int = 1,
-# )::Bool where {F, S}
-# 	(; ray, ray_camera, rays_transformed, subshape_ts) = intersection
-# 	(; depth, shape, subshape_transforms) = fractal_shape
-
-# 	if current_depth == 1
-# 		for i ∈ 1:depth
-# 			if length(rays_transformed) < i
-# 				push!(rays_transformed, Ray(; F))
-# 				push!(subshape_ts, zero(F))
-# 			end
-# 		end
-# 		ray_transformed = rays_transformed[1]
-# 		ray_transformed.loc .= view(ray_camera.loc, :)
-# 		ray_transformed.dir .= view(ray_camera.dir, :)
-# 	end
-
-# 	ray_transformed = rays_transformed[current_depth]
-# 	t = current_depth == 1 ? Inf : subshape_ts[current_depth-1]
-
-# 	subshape_transform_intersect = nothing
-
-# 	for subshape_transform in subshape_transforms
-# 		inverse_transform!(ray, ray_transformed, subshape_transform)
-# 		_intersect_ray!(intersection, shape)
-
-# 		t_transformed = transform_t(intersection, subshape_transform)
-
-# 		if t_transformed < t
-# 			t = t_transformed
-# 			subshape_ts[current_depth] = t
-# 			subshape_transform_intersect = subshape_transform
-# 		end
-# 	end
-
-# 	if isnothing(subshape_transform_intersect)
-# 		closer_intersection_found = false
-# 	else
-# 		if current_depth < depth
-# 			ray_transformed_next = rays_transformed[current_depth+1]
-# 			inverse_transform!(ray_transformed_next, ray_transformed, subshape_transform_intersect)
-# 			closer_intersection_found = _intersect_ray!(
-# 				intersection,
-# 				fractal_shape,
-# 				current_depth = current_depth + 1,
-# 			)
-# 			t_transformed = transform_t(intersection, subshape_transform_intersect)
-
-# 			if t_transformed < intersection.t[1]
-# 				closer_intersection_found = true
-# 			end
-# 		else
-# 			if t_transformed < intersection.t[1]
-# 				intersection.t[1] = t_transformed
-# 				closer_intersection_found = true
-# 			end
-# 		end
-# 	end
-
-# 	return closer_intersection_found
-# end
 
 """
 Compute the intersection of a ray with a triangle given by

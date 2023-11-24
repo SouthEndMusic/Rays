@@ -67,7 +67,7 @@ end
     closer_intersection_found = Rays._intersect_ray!(intersection, sponge)
     @test closer_intersection_found
     @test !isinf(intersection.t[1])
-    @test intersection.dim[1] == 2
+    @test intersection.dim[1] == 3
 end
 
 @testset "ImplicitSurface" begin
