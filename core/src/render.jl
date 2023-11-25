@@ -13,7 +13,7 @@ function set_dropoff_curve_default!(scene::Scene{F}, camera::Camera{F})::Camera{
     dist_max = zero(F)
 
     for transform in values(scene.transforms)
-        center = isnothing(transform.translation) ? zeros(F, 3) : transform.translation
+        center = ismissing(transform.translation) ? zeros(F, 3) : transform.translation
         dist_max = max(dist_max, norm(camera.loc - center))
     end
     dropoff_curve =

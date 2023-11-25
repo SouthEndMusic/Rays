@@ -56,8 +56,8 @@ with the subshapes array automatically generated.
 function menger_sponge(
     R::F,
     depth::Int,
-)::FractalShape{F,Cube{F},AffineTransform{F,F,Nothing,Vector{F}}} where {F}
-    subcube_transforms = AffineTransform{F,F,Nothing,Vector{F}}[]
+)::FractalShape{F,Cube{F},AffineTransform{F,F,Missing,Vector{F}}} where {F}
+    subcube_transforms = AffineTransform{F,F,Missing,Vector{F}}[]
     R_subcube = R / 3
 
     for ordinals in Iterators.product(1:3, 1:3, 1:3)
@@ -70,7 +70,7 @@ function menger_sponge(
 
         push!(
             subcube_transforms,
-            AffineTransform(F(1 / 3), nothing, nothing, center_subcube),
+            AffineTransform(F(1 / 3), missing, missing, center_subcube),
         )
     end
     return FractalShape(:menger_sponge, depth, Cube(R), subcube_transforms)
@@ -155,12 +155,12 @@ Construct a Sierpinski pyramid of given location, size and recursion depth,
 with the subshapes array automatically generated.
 """
 function sierpinski_pyramid(R::F, depth::Int)::FractalShape{F,TriangleShape{F}} where {F}
-    subtetrahedron_transforms = AffineTransform{F,F,Nothing,Vector{F}}[]
+    subtetrahedron_transforms = AffineTransform{F,F,Missing,Vector{F}}[]
     tetrahedron = Tetrahedron(R)
     for i ∈ 1:4
         center_subtetrahedron = tetrahedron.vertices[i, :] / 2
         subtetrahedron_transform =
-            AffineTransform(F(1 / 2), nothing, nothing, center_subtetrahedron)
+            AffineTransform(F(1 / 2), missing, missing, center_subtetrahedron)
         push!(subtetrahedron_transforms, subtetrahedron_transform)
     end
 

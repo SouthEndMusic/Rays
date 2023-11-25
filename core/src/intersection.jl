@@ -525,7 +525,7 @@ function transform_t(
     transform::AffineTransform{F},
 )::F where {F}
     t = intersection.t[1]
-    if !isnothing(transform.scaling)
+    if !ismissing(transform.scaling)
         t *= transform.scaling
     end
     return t
