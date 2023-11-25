@@ -1,7 +1,7 @@
 abstract type RayTransform{F<:AbstractFloat} end
 
 struct AffineTransform{
-    F<:Union{AbstractFloat,Missing},
+    F<:AbstractFloat,
     S<:Union{F,Missing},
     R<:Union{Matrix{F},Missing},
     T<:Union{Vector{F},Missing},
@@ -10,6 +10,28 @@ struct AffineTransform{
     rotation::R
     rotation_inverse::R
     translation::T
+end
+
+function Base.show(io::IO, transform::AffineTransform{F})::Nothing where {F}
+    (; scaling, rotation, translation) = transform
+    if transform isa AffineTransform{F,Missing,Missing,Missing}
+        print(io, "<AffineTransform; identity>")
+    else
+        s = "<AffineTransform;"
+        print(io, "<AffineTransform; with ")
+        if !ismissing(scaling)
+            s *= "scaling, "
+        end
+        if !ismissing(rotation)
+            s *= "rotation, "
+        end
+        if !ismissing(translation)
+            s *= "translation, "
+        end
+        s = s[1:end-2] * ">"
+        print(io, s)
+    end
+    return nothing
 end
 
 function identity_transform(F)::AffineTransform{F,Missing,Missing,Missing}
