@@ -4,8 +4,13 @@ with a shape.
 Intersections should only contain one value per field, but they are vectors to make them mutable.
 """
 struct Intersection{F<:AbstractFloat}
+    # A ray as it comes from the camera
+    ray_camera::Ray{F}
+    # A ray as affine transformed for a shape
     ray::Ray{F}
-    rays_transformed::Vector{Ray{F}}
+    # For fractalshape intersections
+    ray_transformed::Ray{F}
+    # Intersection time
     t::Vector{F}
     # For cube intersections
     dim::Vector{Int}
@@ -21,6 +26,8 @@ struct Intersection{F<:AbstractFloat}
     grad::Vector{F}
     # For coloring
     color::Vector{F}
+    # For transformation without allocation
+    vec_temp::Vector{F}
 end
 
 """
@@ -29,8 +36,9 @@ a certain shape for when there is no intersection.
 """
 function Intersection(; F = Float32)::Intersection
     return Intersection(
+        Ray(; F), # ray_camera
         Ray(; F), # ray
-        Ray{F}[],
+        Ray(; F), # ray_transformed
         [F(Inf)], # t 
         [0], # dim 
         zeros(F, 3), # u
@@ -42,6 +50,7 @@ function Intersection(; F = Float32)::Intersection
         zeros(F, 3), # loc_int
         zeros(F, 3), # grad
         zeros(F, 3), # color
+        zeros(F, 3), # vec_temp
     )
 end
 
@@ -60,15 +69,12 @@ Returns (nothing, nothing) if the intersections do not exist.
 """
 function intersect_sphere(
     ray::Ray{F},
-    center::Vector{F},
     Rsq::F,
 )::Tuple{Union{F,Nothing},Union{F,Nothing}} where {F}
     (; loc, dir) = ray
-
-    diff = loc - center
     a = norm(dir)^2
-    b = 2 * dot(dir, diff)
-    c = norm(diff)^2 - Rsq
+    b = 2 * dot(dir, loc)
+    c = norm(loc)^2 - Rsq
     discr = b^2 - 4 * a * c
 
     if discr >= 0
@@ -89,8 +95,8 @@ real solution to a quadratic polynomial, if it exists.
 """
 function _intersect_ray!(intersection::Intersection{F}, sphere::Sphere)::Bool where {F}
     (; ray) = intersection
-    (; center, Rsq) = sphere
-    t_int_candidate = intersect_sphere(ray, center, Rsq)[1]
+    (; Rsq) = sphere
+    t_int_candidate = intersect_sphere(ray, Rsq)[1]
 
     closer_intersection_found = false
 
@@ -114,8 +120,7 @@ function _intersect_ray!(intersection::Intersection{F}, cube::Cube{F})::Bool whe
     closer_intersection_found = false
 
     for dim ∈ 1:3
-        bound_small = cube.center[dim] - cube.R
-        diff_bound_small = bound_small - ray.loc[dim]
+        diff_bound_small = -cube.R - ray.loc[dim]
         dir_dim_positive = (ray.dir[dim] > 0) # dir_dim = 0 not taken into account
 
         if diff_bound_small > 0.0
@@ -125,8 +130,7 @@ function _intersect_ray!(intersection::Intersection{F}, cube::Cube{F})::Bool whe
                 return closer_intersection_found
             end
         else
-            bound_big = cube.center[dim] + cube.R
-            diff_bound_big = bound_big - ray.loc[dim]
+            diff_bound_big = cube.R - ray.loc[dim]
 
             if diff_bound_big > 0.0
                 if dir_dim_positive
@@ -153,10 +157,10 @@ function _intersect_ray!(intersection::Intersection{F}, cube::Cube{F})::Bool whe
                 if other_dim !== dim
                     loc_int_other_dim_1 =
                         ray.loc[other_dim] + t_int_candidate * ray.dir[other_dim]
-                    if loc_int_other_dim_1 > cube.center[other_dim] + cube.R
+                    if loc_int_other_dim_1 > cube.R
                         candidate = false
                         continue
-                    elseif loc_int_other_dim_1 < cube.center[other_dim] - cube.R
+                    elseif loc_int_other_dim_1 < -cube.R
                         candidate = false
                         continue
                     end
@@ -173,62 +177,35 @@ function _intersect_ray!(intersection::Intersection{F}, cube::Cube{F})::Bool whe
     return closer_intersection_found
 end
 
-
-"""
-Compute the intersection of a ray with a fractal shape.
-This is done recursively until the recursion depth of the fractal shape.
-To compute the intersection of a ray with a subshape, the ray location is transformed.
-"""
 function _intersect_ray!(
     intersection::Intersection{F},
-    fractal_shape::FractalShape{F,S};
+    fractal_shape::FractalShape{F,S,T};
     current_depth::Int = 1,
-)::Bool where {F,S}
+)::Bool where {F,S,T}
     (; ray) = intersection
-    (; subshapes, depth, shrink_factor) = fractal_shape
+    (; depth, shape, subshape_transforms) = fractal_shape
+    closer_intersection_found = false
+    reset_intersection!(intersection)
 
-    if current_depth == 1
-        for i ∈ 1:depth
-            if length(intersection.rays_transformed) < i
-                push!(intersection.rays_transformed, ray)
+    for subshape_transform in subshape_transforms
+        intersection.t[1] /= subshape_transform.scaling
+        inverse_transform!(ray, ray, subshape_transform)
+        if _intersect_ray!(intersection, shape)
+            if current_depth < depth
+                if _intersect_ray!(
+                    intersection,
+                    fractal_shape,
+                    current_depth = current_depth + 1,
+                )
+                    closer_intersection_found = true
+                end
+            else
+                closer_intersection_found = true
             end
         end
+        forward_transform!(ray, ray, subshape_transform)
+        intersection.t[1] *= subshape_transform.scaling
     end
-
-    ray.loc .= intersection.rays_transformed[depth].loc
-    subshape_intersect = nothing
-
-    for subshape in subshapes
-        closer_intersection_found = _intersect_ray!(intersection, subshape)
-
-        if closer_intersection_found
-            subshape_intersect = subshape
-        end
-    end
-
-    if isnothing(subshape_intersect)
-        closer_intersection_found = false
-    else
-        if current_depth < depth
-            reset_intersection!(intersection)
-            ray_transformed = intersection.rays_transformed[current_depth+1]
-            ray_transformed.loc .= ray.loc
-            ray_transformed.loc .+= fractal_shape.center
-            ray_transformed.loc .-= subshape_intersect.center
-            ray_transformed.loc .*= shrink_factor
-
-            intersection.t[1] *= shrink_factor
-            closer_intersection_found = _intersect_ray!(
-                intersection,
-                fractal_shape,
-                current_depth = current_depth + 1,
-            )
-            intersection.t[1] /= shrink_factor
-        else
-            closer_intersection_found = true
-        end
-    end
-
     return closer_intersection_found
 end
 
@@ -363,10 +340,10 @@ function _intersect_ray!(
 )::Bool where {F}
     (; loc_int, ray, grad) = intersection
     (; loc, dir) = ray
-    (; f, ∇f!, itermax, tol, center, R_bound, n_divisions) = shape
+    (; f, ∇f!, itermax, tol, R_bound, n_divisions) = shape
 
     # Compute intersections of the ray with the bounding sphere
-    bound_lower, bound_upper = intersect_sphere(ray, center, R_bound^2)
+    bound_lower, bound_upper = intersect_sphere(ray, R_bound^2)
 
     # If there are no intersections with the bounding sphere,
     # there are certainly no intersections with the implicit surface
@@ -544,4 +521,18 @@ function _intersect_ray!(
     end
 
     return closer_intersection_found
+end
+
+"""
+Transform the intersection time by the scaling of the given affine transform.
+"""
+function transform_t(
+    intersection::Intersection{F},
+    transform::AffineTransform{F},
+)::F where {F}
+    t = intersection.t[1]
+    if !ismissing(transform.scaling)
+        t *= transform.scaling
+    end
+    return t
 end

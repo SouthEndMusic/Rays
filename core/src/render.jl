@@ -12,8 +12,9 @@ function set_dropoff_curve_default!(scene::Scene{F}, camera::Camera{F})::Camera{
     end
     dist_max = zero(F)
 
-    for shape in values(scene.shapes)
-        dist_max = max(dist_max, norm(camera.loc - shape.center))
+    for transform in values(scene.transforms)
+        center = ismissing(transform.translation) ? zeros(F, 3) : transform.translation
+        dist_max = max(dist_max, norm(camera.loc - center))
     end
     dropoff_curve =
         ScalarFunc{F}(t -> max(zero(F), one(F) - t / (convert(F, 1.5) * dist_max)))
@@ -182,7 +183,7 @@ function render!(
             indices = CI[I_flat]
 
             # Set the ray based on the current pixel of the camera
-            set_ray!(intersection.ray, camera, Tuple(indices))
+            set_ray!(intersection.ray_camera, camera, Tuple(indices))
 
             # Calculate shape intersections
             for intersector! in values(intersectors)

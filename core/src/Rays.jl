@@ -5,7 +5,7 @@ import SimpleDirectMediaLayer as SDL
 using Accessors: @set
 using Base.Threads
 using FunctionWrappers: FunctionWrapper
-using LinearAlgebra: cross, normalize, normalize!, norm, dot, transpose!
+using LinearAlgebra: cross, normalize, normalize!, norm, dot, transpose!, mul!
 using SimpleDirectMediaLayer.LibSDL2
 
 const ScalarFunc = FunctionWrapper{F,Tuple{F}} where {F<:AbstractFloat}
@@ -16,6 +16,7 @@ const VectorField =
 
 include("utils.jl")
 include("camera.jl")
+include("transform.jl")
 include("shape.jl")
 include("intersection.jl")
 include("texture.jl")

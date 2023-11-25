@@ -7,6 +7,12 @@ struct UniformTexture{F} <: Texture{F}
     color::Vector{F}
 end
 
+function Base.show(io::IO, texture::UniformTexture)::Nothing
+    (; color) = texture
+    print(io, "<UniformTexture; color = $color>")
+    return nothing
+end
+
 """
 A texture where an integer variable (:dim or :face) is chosen
 and each value of this variable is given its own color.
@@ -17,12 +23,25 @@ struct IntegerMappingTexture{F} <: Texture{F}
     variable::Symbol
 end
 
+function Base.show(io::IO, texture::IntegerMappingTexture)::Nothing
+    (; variable, mapping) = texture
+    n_colors = size(mapping)[2]
+    print(io, "<IntegerMappingTexture; variable = $variable, $n_colors colors>")
+    return nothing
+end
+
 """
 A texture where each point in 3D space is assigned a color
 with the (in place) vector function field!.
 """
 struct ColorFieldTexture{F} <: Texture{F}
     field!::VectorField{F}
+end
+
+function Base.show(io::IO, texture::ColorFieldTexture)::Nothing
+    (; field!) = texture
+    print(io, "<ColorFieldTexture; field! = $field!>")
+    return nothing
 end
 
 """

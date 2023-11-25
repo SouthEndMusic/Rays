@@ -2,6 +2,7 @@ using Test
 using Rays: Rays
 using Random: seed!
 using DelimitedFiles
+using LinearAlgebra: normalize, norm
 
 @testset "blur_kernel" begin
     kernel, Δi_max = Rays.get_blur_kernel(1.6)
@@ -19,7 +20,6 @@ end
     Rays.look_at!(camera, from, to)
     push!(scene, camera)
 
-    origin = zeros(Float32, 3)
     R = 1.0f0
 
     function my_field(loc::Vector{F})::F where {F}
@@ -33,28 +33,20 @@ end
     end
 
     shapes = [
-        Rays.Cube(origin, R),
-        Rays.menger_sponge(origin, R, 4),
-        Rays.Sphere(origin, R),
-        Rays.Tetrahedron(origin, R),
-        Rays.sierpinski_pyramid(origin, R, 4),
+        Rays.Cube(R),
+        Rays.menger_sponge(R, 4),
+        Rays.Sphere(R),
+        Rays.Tetrahedron(R),
+        Rays.sierpinski_pyramid(R, 4),
         Rays.ImplicitSurface(
             my_field,
-            origin,
             R_bound = 1.5f0,
             n_divisions = 50,
             tol = 1.0f-5,
             itermax = 10,
             name = :equipotential_surface,
         ),
-        Rays.RevolutionSurface(
-            z -> z^2 + 0.1f0,
-            3.0f0,
-            -1.0f0,
-            0.75f0,
-            zeros(Float32, 3);
-            n_divisions = 50,
-        ),
+        Rays.RevolutionSurface(z -> z^2 + 0.1f0, 3.0f0, -1.0f0, 0.75f0; n_divisions = 50),
     ]
 
     push!(scene, shapes[1])
@@ -66,6 +58,8 @@ end
         Rays.render!(scene)
         return nothing
     end
+
+    # writing files: writedlm("cube_render.csv", camera.canvas[1, :, :], ',') 
 
     simple_view!(shapes[1])
     @test camera.canvas[1, :, :] ≈
@@ -108,15 +102,18 @@ end
     )
 
     # Many shapes
-    seed!(31415)
+    seed!(314156)
     Rays.clear_shapes!(scene)
     n_cubes = 250
 
     for i ∈ 1:n_cubes
-        center = rand(Float32, 3) * 2 .- 1
-        R = rand(Float32) / 10
-        cube = Rays.Cube(center, R)
-        push!(scene, cube)
+        center = Float32.(1.2 * (rand(3) * 2 .- 1))
+        R = 0.25f0 / ((2 * norm(center))^2 + 1)
+        transform =
+            Rays.translation(center) *
+            Rays.rotation(normalize(rand(Float32, 3)), Float32(2π) * rand(Float32))
+        cube = Rays.Cube(R)
+        push!(scene, cube; transform)
     end
 
     Rays.render!(scene)
@@ -133,9 +130,8 @@ end
     Rays.look_at!(camera, from, to)
     push!(scene, camera)
 
-    origin = zeros(Float32, 3)
     R = 1.0f0
-    push!(scene, Rays.Cube(origin, R))
+    push!(scene, Rays.Cube(R))
 
     Rays.set_dropoff_curve_default!(scene, camera)
 

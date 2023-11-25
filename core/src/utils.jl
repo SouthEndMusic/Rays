@@ -24,3 +24,7 @@ function snake_case_name(T)::Symbol
     name_snake_case = join([part.match for part in parts], "_") |> lowercase
     return Symbol(name_snake_case)
 end
+
+function identity_matrix(F)::Matrix
+    return F[1 0 0; 0 1 0; 0 0 1]
+end
