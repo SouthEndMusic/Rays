@@ -34,6 +34,7 @@ function clear_shapes!(scene::Scene)::Nothing
     empty!(scene.shapes)
     empty!(scene.transforms)
     empty!(scene.intersectors)
+    empty!(scene.textures)
     empty!(scene.texturers)
     return nothing
 end
