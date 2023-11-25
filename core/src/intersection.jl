@@ -26,6 +26,8 @@ struct Intersection{F<:AbstractFloat}
     grad::Vector{F}
     # For coloring
     color::Vector{F}
+    # For transformation without allocation
+    vec_temp::Vector{F}
 end
 
 """
@@ -48,6 +50,7 @@ function Intersection(; F = Float32)::Intersection
         zeros(F, 3), # loc_int
         zeros(F, 3), # grad
         zeros(F, 3), # color
+        zeros(F, 3), # vec_temp
     )
 end
 

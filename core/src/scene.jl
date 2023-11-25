@@ -113,7 +113,12 @@ function create_intersector(
 )::Intersector{F} where {F}
     return Intersector{F}(
         intersection -> begin
-            inverse_transform!(intersection.ray, intersection.ray_camera, transform)
+            inverse_transform!(
+                intersection.ray,
+                intersection.ray_camera,
+                transform;
+                intersection.vec_temp,
+            )
             if _intersect_ray!(intersection, shape)
                 intersection.name_intersected[1] = shape.name
                 intersection.t[1] = transform_t(intersection, transform)
