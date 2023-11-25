@@ -523,6 +523,9 @@ function _intersect_ray!(
     return closer_intersection_found
 end
 
+"""
+Transform the intersection time by the scaling of the given affine transform.
+"""
 function transform_t(
     intersection::Intersection{F},
     transform::AffineTransform{F},

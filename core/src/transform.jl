@@ -1,5 +1,9 @@
 abstract type RayTransform{F<:AbstractFloat} end
 
+"""
+A ray transform type that can contain a scaling, a rotation
+and a translation.
+"""
 struct AffineTransform{
     F<:AbstractFloat,
     S<:Union{F,Missing},
@@ -34,14 +38,25 @@ function Base.show(io::IO, transform::AffineTransform{F})::Nothing where {F}
     return nothing
 end
 
+"""
+Get the identity (affine) transform of given type.
+"""
 function identity_transform(F)::AffineTransform{F,Missing,Missing,Missing}
     return AffineTransform{F,Missing,Missing,Missing}(missing, missing, missing, missing)
 end
 
+"""
+Get an affine transform which only consists of a translation.
+"""
 function translation(vector::Vector{F})::AffineTransform{F} where {F}
     return AffineTransform(missing, missing, missing, vector)
 end
 
+"""
+Get an affine transform which only consists of a rotation around the given
+axis by the given amount.
+Note: The axis must be a unit vector.
+"""
 function rotation(axis::Vector{F}, θ::F)::AffineTransform{F} where {F}
     R = zeros(F, 3, 3)
     W = [0 -axis[3] axis[2]; axis[3] 0 -axis[1]; -axis[2] axis[1] 0]
@@ -53,6 +68,10 @@ function rotation(axis::Vector{F}, θ::F)::AffineTransform{F} where {F}
     return AffineTransform(missing, R, inv(R), missing)
 end
 
+"""
+Define the * operator for composing (combining) 
+2 affine transformations.
+"""
 function Base.:*(
     transform_second::AffineTransform{F},
     transform_first::AffineTransform{F},
@@ -85,6 +104,10 @@ function Base.:*(
     return AffineTransform(scaling, rotation, rotation_inverse, translation)
 end
 
+"""
+Apply an affine transformation on the source ray and store the result
+in the destination ray.
+"""
 function forward_transform!(
     ray_dst::Ray{F},
     ray_src::Ray{F},
@@ -114,6 +137,10 @@ function forward_transform!(
     return nothing
 end
 
+"""
+Apply the inverse of an affine transform on the source ray and store
+the results in the destination ray.
+"""
 function inverse_transform!(
     ray_dst::Ray{F},
     ray_src::Ray{F},
