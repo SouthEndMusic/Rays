@@ -101,7 +101,12 @@ function Base.:*(
     if scaling ≈ one(F)
         scaling = missing
     end
-    return AffineTransform(scaling, rotation, rotation_inverse, translation)
+    return AffineTransform{F,typeof(scaling),typeof(rotation),typeof(translation)}(
+        scaling,
+        rotation,
+        rotation_inverse,
+        translation,
+    )
 end
 
 """
