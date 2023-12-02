@@ -10,3 +10,6 @@ experiments
 
 # formatting
 format.jl
+
+# Misc
+examples/ribasim/generated_testmodels

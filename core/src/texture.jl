@@ -14,19 +14,17 @@ function Base.show(io::IO, texture::UniformTexture)::Nothing
 end
 
 """
-A texture where an integer variable (:dim or :face) is chosen
-and each value of this variable is given its own color.
+A texture where an integer is given a color.
 The shape of the mapping is (3, n_colors).
 """
 struct IntegerMappingTexture{F} <: Texture{F}
     mapping::Matrix{F}
-    variable::Symbol
 end
 
 function Base.show(io::IO, texture::IntegerMappingTexture)::Nothing
-    (; variable, mapping) = texture
+    (; mapping) = texture
     n_colors = size(mapping)[2]
-    print(io, "<IntegerMappingTexture; variable = $variable, $n_colors colors>")
+    print(io, "<IntegerMappingTexture; $n_colors colors>")
     return nothing
 end
 
@@ -54,8 +52,12 @@ end
 """
 Apply a uniform color.
 """
-function color!(intersection::Intersection{F}, texture::UniformTexture)::Nothing where {F}
-    (; color) = intersection
+function color!(
+    color::AbstractVector{F},
+    cache_int::AbstractVector{Int},
+    cache_float::AbstractVector{F},
+    texture::UniformTexture,
+)::Nothing where {F}
     color .= view(texture.color, :)
     return nothing
 end
@@ -64,22 +66,13 @@ end
 Apply the color associated with the given integer intersection variable.
 """
 function color!(
-    intersection::Intersection{F},
+    color::AbstractVector{F},
+    cache_int::AbstractVector{Int},
+    cache_float::AbstractVector{F},
     texture::IntegerMappingTexture,
 )::Nothing where {F}
-    (; variable, mapping) = texture
-    (; color, face, dim) = intersection
-
-    # getfield would lead to runtime dispatch
-    if variable == :dim
-        value = dim[1]
-    elseif variable == :face
-        value = face[1]
-    else
-        error("Invalid integer intersection variable \'$variable\'.")
-    end
-
-    color .= view(mapping, :, value)
+    (; mapping) = texture
+    color .= view(mapping, :, cache_int[1])
     return nothing
 end
 
@@ -87,12 +80,11 @@ end
 Apply the color given by the color field at the intersection location.
 """
 function color!(
-    intersection::Intersection{F},
+    color::AbstractVector{F},
+    cache_int::AbstractVector{Int},
+    cache_float::AbstractVector{F},
     texture::ColorFieldTexture,
 )::Nothing where {F}
-    (; loc_int, ray, t, color) = intersection
-    (; loc, dir) = ray
-
     loc_int .= view(dir, :)
     loc_int .*= t[1]
     loc_int .+= view(loc, :)

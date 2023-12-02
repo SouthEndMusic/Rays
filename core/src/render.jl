@@ -29,16 +29,17 @@ Apply the dropoff curve.
 """
 function cam_is_source!(
     camera::Camera{F},
-    t_intersect::F,
+    t::AbstractVector{F},
     name_intersected::Symbol,
     pixel_indices::Tuple{Int,Int},
+    thread_id::Int,
 )::Nothing where {F}
     (; canvas, dropoff_curve) = camera
 
     if name_intersected == :none
         shade = zero(F)
     else
-        shade = dropoff_curve(t_intersect)
+        shade = dropoff_curve(t[thread_id])
     end
 
     canvas[:, pixel_indices...] .= shade
@@ -127,19 +128,20 @@ function set_color!(
     intersection::Intersection{F},
     texturers::Dict{Symbol,Texturer{F}},
     pixel_indices::Tuple{Int,Int},
+    thread_id::Int,
 )::Nothing where {F}
     (; name_intersected) = intersection
     (; canvas) = camera
 
     # Get texture color
-    if name_intersected[1] == :none
+    if name_intersected[thread_id] == :none
         intersection.color .= zero(F)
     else
-        texturers[name_intersected[1]](intersection)
+        texturers[name_intersected[thread_id]](intersection, thread_id)
     end
 
     # Set texture color
-    @views(canvas[:, pixel_indices...] .*= intersection.color[:])
+    @views(canvas[:, pixel_indices...] .*= intersection.color[thread_id, :])
     return nothing
 end
 
@@ -171,39 +173,39 @@ function render!(
     # Number of pixels
     n_pixels = prod(screen_res)
 
-    # Intersection objects
-    intersections = [Intersection(; F) for i ∈ 1:nthreads()]
+    # Intersection object
+    intersections = Intersection(nthreads(); vector_prototype = camera.loc)
 
     # Reset the canvas
     canvas .= one(F)
 
     @threads for task ∈ 1:n_tasks
-        intersection = intersections[threadid()]
+        thread_id = threadid()
         for I_flat ∈ task:n_tasks:n_pixels
             indices = CI[I_flat]
 
             # Set the ray based on the current pixel of the camera
-            set_ray!(intersection.ray_camera, camera, Tuple(indices))
+            set_ray!(intersections.ray_camera, camera, Tuple(indices), thread_id)
 
             # Calculate shape intersections
             for intersector! in values(intersectors)
-                intersector!(intersection)
+                intersector!(intersections, thread_id)
             end
 
             # Apply shading
-            t = intersection.t
-            t_intersect[indices] = t[1]
+            t_intersect[indices] = intersections.t[thread_id]
             if cam_is_source
                 cam_is_source!(
                     camera,
-                    only(intersection.t),
-                    only(intersection.name_intersected),
+                    intersections.t,
+                    intersections.name_intersected[thread_id],
                     Tuple(indices),
+                    thread_id,
                 )
             end
 
-            set_color!(camera, intersection, texturers, Tuple(indices))
-            reset_intersection!(intersection)
+            set_color!(camera, intersections, texturers, Tuple(indices), thread_id)
+            reset_intersection!(intersections, thread_id)
         end
     end
 

@@ -184,16 +184,19 @@ end
 loc: The origin of the ray 
 dir: The direction of the ray (unit vector)
 """
-struct Ray{F<:AbstractFloat}
-    loc::Vector{F}
-    dir::Vector{F}
+struct Ray{MF<:AbstractMatrix{F} where {F<:AbstractFloat}}
+    loc::MF
+    dir::MF
 end
 
 """
 Construct a ray.
 """
-function Ray(; F = Float32)::Ray
-    return Ray(zeros(F, 3), F[1.0, 0.0, 0.0])
+function Ray(
+    n::Int;
+    vector_prototype::AbstractVector{F} where {F<:AbstractFloat} = zeros(Float32, 3),
+)::Ray
+    return Ray(similar(vector_prototype, (n, 3)), similar(vector_prototype, (n, 3)))
 end
 
 """
@@ -201,10 +204,11 @@ Compute the location and direction of a ray emited from the camera for
 the given pixel indices.
 """
 function set_ray!(
-    ray::Ray{F},
+    rays::Ray{MF},
     camera::Camera{F},
     pixel_indices::Tuple{Int,Int},
-)::Nothing where {F}
+    threadid::Int,
+)::Nothing where {F,MF}
     (; screen_dist, screen_size, screen_res, dir, loc, up, right, warp!) = camera
 
     screen_dist = screen_dist[1]
@@ -213,13 +217,16 @@ function set_ray!(
     s_h, s_w = screen_size
     res_h, res_w = screen_res
 
-    @. ray.loc = loc + screen_dist * dir
-    @. ray.loc -= ((i - 1) / (res_h - 1) - 0.5) * s_h * up
-    @. ray.loc += ((j - 1) / (res_w - 1) - 0.5) * s_w * right
+    ray_loc = view(rays.loc, threadid, :)
+    ray_dir = view(rays.dir, threadid, :)
 
-    @. ray.dir = ray.loc - loc
-    normalize!(ray.dir)
-    warp!(ray.loc)
+    @. ray_loc = loc + screen_dist * dir
+    @. ray_loc -= ((i - 1) / (res_h - 1) - 0.5) * s_h * up
+    @. ray_loc += ((j - 1) / (res_w - 1) - 0.5) * s_w * right
+
+    @. ray_dir = ray_loc - loc
+    normalize!(ray_dir)
+    warp!(ray_loc)
 
     return nothing
 end
