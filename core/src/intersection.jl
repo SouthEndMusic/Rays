@@ -82,13 +82,13 @@ Compute the intersections of a ray with a sphere.
 Returns (nothing, nothing) if the intersections do not exist.
 """
 function intersect_sphere(
-    ray::Ray{F},
+    ray_loc::VF,
+    ray_dir::VF,
     Rsq::F,
-)::Tuple{Union{F,Nothing},Union{F,Nothing}} where {F}
-    (; loc, dir) = ray
-    a = norm(dir)^2
-    b = 2 * dot(dir, loc)
-    c = norm(loc)^2 - Rsq
+)::Tuple{Union{F,Nothing},Union{F,Nothing}} where {F<:AbstractFloat,VF<:AbstractVector{F}}
+    a = norm(ray_dir)^2
+    b = 2 * dot(ray_dir, ray_loc)
+    c = norm(ray_loc)^2 - Rsq
     discr = b^2 - 4 * a * c
 
     if discr >= 0
@@ -107,17 +107,23 @@ end
 Compute the intersection of a ray with a sphere as the smallest
 real solution to a quadratic polynomial, if it exists.
 """
-function _intersect_ray!(intersection::Intersection{F}, sphere::Sphere)::Bool where {F}
-    (; ray) = intersection
+function _intersect_ray!(
+    t::AbstractVector{F},
+    cache_int::AbstractVector{Int},
+    cache_float::AbstractVector{F},
+    ray_loc::AbstractVector{F},
+    ray_dir::AbstractVector{F},
+    sphere::Sphere{F},
+)::Bool where {F}
     (; Rsq) = sphere
-    t_int_candidate = intersect_sphere(ray, Rsq)[1]
+    t_int_candidate = intersect_sphere(ray_loc, ray_dir, Rsq)[1]
 
     closer_intersection_found = false
 
     if !isnothing(t_int_candidate)
-        if t_int_candidate < intersection.t[1]
+        if t_int_candidate < t[1]
             closer_intersection_found = true
-            intersection.t[1] = t_int_candidate
+            t[1] = t_int_candidate
         end
     end
 
