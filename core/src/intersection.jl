@@ -251,26 +251,30 @@ Compute the intersection of a ray with a triangle given by
 the triangle vertices.
 """
 function _intersect_ray!(
-    intersection::Intersection{F},
+    ray_loc::VF,
+    ray_dir::VF,
+    cache_float::VF,
     triangle_vertices::AbstractArray{F};
     normal::Union{AbstractVector{F},Nothing} = nothing,
     t_int_prev::Union{F,Nothing} = nothing,
-)::F where {F}
-    (; ray, diff, diff2, u, v) = intersection
-    (; loc, dir) = intersection.ray
+)::F where {F<:AbstractFloat,VF<:AbstractVector{F}}
 
     if isnothing(normal)
+        u = view(cache_float, 1:3)
+        v = view(cache_float, 4:6)
+
         c = view(triangle_vertices, 3, :)
-        u .= view(triangle_vertices, 1, :) - c
-        v .= view(triangle_vertices, 2, :) - c
+        u = view(triangle_vertices, 1, :) - c
+        v = view(triangle_vertices, 2, :) - c
         normal = cross(u, v)
         normalize!(normal)
     end
 
+    diff = view(cache_float, 7:9)
     diff .= 0.0
     diff .+= view(triangle_vertices, 3, :)
-    diff .-= loc
-    t_int_candidate = dot(diff, normal) / dot(dir, normal)
+    diff .-= ray_loc
+    t_int_candidate = dot(diff, normal) / dot(ray_dir, normal)
 
     if t_int_candidate < 0.0
         return t_int_prev
@@ -285,6 +289,9 @@ function _intersect_ray!(
     end
 
     if !isnothing(normal)
+        u = view(cache_float, 1:3)
+        v = view(cache_float, 4:6)
+
         c = view(triangle_vertices, 3, :)
         u .= 0.0
         v .= 0.0
@@ -298,7 +305,8 @@ function _intersect_ray!(
     v_normsq = dot(v, v)
     inner_uv = dot(u, v)
     det = u_normsq * v_normsq - inner_uv^2
-    diff2 .= @. t_int_candidate * ray.dir - diff
+    diff2 = view(cache_float, 10:12)
+    diff2 .= @. t_int_candidate * ray_dir - diff
     inner_u = dot(diff2, u)
     inner_v = dot(diff2, v)
     λ_1 = (inner_u * v_normsq - inner_v * inner_uv) / det
@@ -325,9 +333,13 @@ Compute the intersection of a ray with a triangle shape
 as the smallest intersection time over all triangles.
 """
 function _intersect_ray!(
-    intersection::Intersection{F},
-    shape::TriangleShape{F};
-)::Bool where {F}
+    t::AbstractVector{F},
+    cache_int::AbstractVector{Int},
+    cache_float::VF,
+    ray_loc::VF,
+    ray_dir::VF,
+    shape::TriangleShape{F},
+)::Bool where {F<:AbstractFloat,VF<:AbstractVector{F}}
     (; vertices, faces, normals) = shape
 
     closer_intersection_found = false
@@ -336,15 +348,17 @@ function _intersect_ray!(
         triangle_vertices = view(vertices, view(faces, i, :), :)
         normal = view(normals, i, :)
         t_int_candidate = _intersect_ray!(
-            intersection,
+            ray_loc,
+            ray_dir,
+            cache_float,
             triangle_vertices;
             normal,
-            t_int_prev = intersection.t[1],
+            t_int_prev = t[1],
         )
-        if t_int_candidate < intersection.t[1]
+        if t_int_candidate < t[1]
             closer_intersection_found = true
-            intersection.t[1] = t_int_candidate
-            intersection.face[1] = i
+            t[1] = t_int_candidate
+            cache_int[1] = i
         end
     end
 
