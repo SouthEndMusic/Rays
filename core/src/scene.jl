@@ -1,18 +1,45 @@
-const Intersector = FunctionWrapper{Nothing,Tuple{Intersection{F},Int}} where {F}
-const Texturer = FunctionWrapper{Nothing,Tuple{Intersection{F},Int}} where {F}
+const TypedSubArray = SubArray{
+    T,
+    1,
+    MT,
+    Tuple{Int64,Base.Slice{Base.OneTo{Int64}}},
+    true,
+} where {T,MT<:AbstractMatrix{T}}
+const Intersector = FunctionWrapper{
+    Nothing,
+    Tuple{VFS,VFS,VFS,VFS,VFS,VIS,VFS,TypedSubArray{Symbol,Matrix{Symbol}}},
+} where {
+    VFS<:TypedSubArray{F,MF} where {F<:AbstractFloat,MF<:AbstractMatrix{F}},
+    VIS<:TypedSubArray{Int,MI} where {MI<:AbstractMatrix{Int}},
+}
+const Texturer = FunctionWrapper{
+    Nothing,
+    Tuple{VFS,VIS,VFS},
+} where {
+    VFS<:TypedSubArray{F,MF} where {F<:AbstractFloat,MF<:AbstractMatrix{F}},
+    VIS<:TypedSubArray{Int,MI} where {MI<:AbstractMatrix{Int}},
+}
 
 """
 Object for holding the data of all cameras and shapes in a scene.
 """
-struct Scene{F<:AbstractFloat}
+struct Scene{
+    F<:AbstractFloat,
+    MF<:AbstractMatrix{F},
+    MI<:AbstractMatrix{Int},
+    VFS<:TypedSubArray{F,MF},
+    VIS<:TypedSubArray{Int,MI},
+}
     cameras::Dict{Symbol,Camera{F}}
     # Heterogenous values: slow
     shapes::Dict{Symbol,Shape{F}}
     textures::Dict{Symbol,Texture{F}}
     transforms::Dict{Symbol,AffineTransform{F}}
     # Fully typed wrapped functions: fast
-    intersectors::Dict{Symbol,Intersector{F}}
-    texturers::Dict{Symbol,Texturer{F}}
+    intersectors::Dict{Symbol,Intersector{VFS,VIS}}
+    texturers::Dict{Symbol,Texturer{VFS,VIS}}
+    # Intersection data of rays with shapes
+    intersections::Intersection{F,MF,MI}
 end
 
 """
@@ -20,7 +47,8 @@ Check whether the given name already is a name of a camera or a shape.
 """
 function name_exists(scene::Scene, name::Symbol)::Bool
     for fieldname in fieldnames(Scene)
-        if name in keys(getfield(scene, fieldname))
+        value = getfield(scene, fieldname)
+        if isa(value, Dict) && name in keys(value)
             return true
         end
     end
@@ -62,8 +90,29 @@ end
 """
 Get an empty scene.
 """
-function Scene(; x::F = 0.0f0)::Scene{F} where {F<:AbstractFloat}
-    return Scene([type{F}() for type in fieldtypes(Scene)]...)
+function Scene(;
+    matrix_prototype::MF = zeros(Float32, 3, 3),
+)::Scene{eltype(MF),MF} where {MF<:AbstractMatrix{F} where {F<:AbstractFloat}}
+    F = eltype(MF)
+    MI = typeof(similar(matrix_prototype, Int))
+    VFS = TypedSubArray{F,MF}
+    VIS = TypedSubArray{Int,MI}
+    cameras = Dict{Symbol,Camera{F}}()
+    shapes = Dict{Symbol,Shape{F}}()
+    textures = Dict{Symbol,Texture{F}}()
+    transforms = Dict{Symbol,AffineTransform{F}}()
+    intersectors = Dict{Symbol,Intersector{VFS,VIS}}()
+    texturers = Dict{Symbol,Texturer{VFS,VIS}}()
+    intersections = Intersection(nthreads(); matrix_prototype)
+    return Scene(
+        cameras,
+        shapes,
+        textures,
+        transforms,
+        intersectors,
+        texturers,
+        intersections,
+    )
 end
 
 """
@@ -110,43 +159,54 @@ Create the anonymous intersector function
 """
 function create_intersector(
     shape::Shape{F},
-    transform::AffineTransform{F},
-)::Intersector{F} where {F}
-    return Intersector{F}(
-        (intersections, thread_id) -> begin
-            ray_loc = view(intersections.ray.loc, thread_id, :)
-            ray_dir = view(intersections.ray.dir, thread_id, :)
-            ray_camera_loc = view(intersections.ray_camera.loc, thread_id, :)
-            ray_camera_dir = view(intersections.ray_camera.dir, thread_id, :)
-            t = view(intersections.t, thread_id:thread_id)
-            cache_int = view(intersections.cache_int, thread_id, :)
-            cache_float = view(intersections.cache_float, thread_id, :)
+    transform::AffineTransform{F};
+    matrix_prototype::MF = zeros(Float32, 3, 3),
+)::Intersector where {F<:AbstractFloat,MF<:AbstractMatrix{F}}
+    VFS = TypedSubArray{F,MF}
+    VI = typeof(similar(matrix_prototype, Int))
+    VIS = TypedSubArray{Int,VI}
+    intersector = Intersector{VFS,VIS}(
+        (
+            t,
+            ray_loc,
+            ray_dir,
+            ray_camera_loc,
+            ray_camera_dir,
+            cache_int,
+            cache_float,
+            name_intersected,
+        ) -> begin
             inverse_transform!(
                 ray_loc,
                 ray_dir,
                 ray_camera_loc,
                 ray_camera_dir,
                 cache_float,
-                transform;
+                transform,
             )
             if _intersect_ray!(t, cache_int, cache_float, ray_loc, ray_dir, shape)
-                intersections.name_intersected[thread_id] = shape.name
+                name_intersected[1] = shape.name
                 transform_t!(t, transform)
             end
+            return nothing
         end,
     )
+    return intersector
 end
 
 """
 Create the anonymous texturer function
 (Done outside Base.push for shapes to avoid runtime dispatch)
 """
-function create_texturer(texture::Texture{F})::Texturer{F} where {F}
-    return Texturer{F}(
-        (intersection, thread_id) -> begin
-            color = view(intersection.color, thread_id, :)
-            cache_int = view(intersection.cache_int, thread_id, :)
-            cache_float = view(intersection.cache_float, thread_id, :)
+function create_texturer(
+    texture::Texture{F};
+    matrix_prototype::MF = zeros(Float32, 3, 3),
+)::Texturer where {F<:AbstractFloat,MF<:AbstractMatrix{F}}
+    VFS = TypedSubArray{F,MF}
+    VI = typeof(similar(matrix_prototype, Int))
+    VIS = TypedSubArray{Int,VI}
+    return Texturer{VFS,VIS}(
+        (color, cache_int, cache_float) -> begin
             color!(color, cache_int, cache_float, texture)
         end,
     )

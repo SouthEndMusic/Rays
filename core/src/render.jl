@@ -30,16 +30,15 @@ Apply the dropoff curve.
 function cam_is_source!(
     camera::Camera{F},
     t::AbstractVector{F},
-    name_intersected::Symbol,
     pixel_indices::Tuple{Int,Int},
-    thread_id::Int,
 )::Nothing where {F}
     (; canvas, dropoff_curve) = camera
+    t = t[1]
 
-    if name_intersected == :none
+    if isinf(t)
         shade = zero(F)
     else
-        shade = dropoff_curve(t[thread_id])
+        shade = dropoff_curve(t)
     end
 
     canvas[:, pixel_indices...] .= shade
@@ -125,23 +124,24 @@ If no intersection was found, set the color to black.
 """
 function set_color!(
     camera::Camera{F},
-    intersection::Intersection{F},
-    texturers::Dict{Symbol,Texturer{F}},
+    color::VF,
+    texturers::Dict,
+    name_intersected::Symbol,
     pixel_indices::Tuple{Int,Int},
-    thread_id::Int,
-)::Nothing where {F}
-    (; name_intersected) = intersection
+    cache_int::VI,
+    cache_float::VF,
+)::Nothing where {F,VF<:AbstractVector{F},VI<:AbstractVector{Int}}
     (; canvas) = camera
 
     # Get texture color
-    if name_intersected[thread_id] == :none
-        intersection.color .= zero(F)
+    if name_intersected == :none
+        color .= zero(F)
     else
-        texturers[name_intersected[thread_id]](intersection, thread_id)
+        texturers[name_intersected](color, cache_int, cache_float)
     end
 
     # Set texture color
-    @views(canvas[:, pixel_indices...] .*= intersection.color[thread_id, :])
+    @views(canvas[:, pixel_indices...] .*= color)
     return nothing
 end
 
@@ -161,11 +161,11 @@ function render!(
         scene.cameras[name_camera]
     end
 
-    (; intersectors, texturers) = scene
+    (; intersectors, texturers, intersections) = scene
     (; canvas, t_intersect, screen_res, focus_curve) = camera
 
     # Number of tasks
-    n_tasks = 10 * nthreads()
+    n_tasks = nthreads()
 
     # All indices of the render
     CI = CartesianIndices(Tuple(screen_res))
@@ -173,39 +173,56 @@ function render!(
     # Number of pixels
     n_pixels = prod(screen_res)
 
-    # Intersection object
-    intersections = Intersection(nthreads(); vector_prototype = camera.loc)
-
     # Reset the canvas
     canvas .= one(F)
 
     @threads for task ∈ 1:n_tasks
-        thread_id = threadid()
+        ray_loc,
+        ray_dir,
+        ray_camera_loc,
+        ray_camera_dir,
+        t,
+        cache_int,
+        cache_float,
+        color,
+        name_intersected = get_caches(intersections, threadid())
+
         for I_flat ∈ task:n_tasks:n_pixels
+            reset_intersection!(t, name_intersected)
             indices = CI[I_flat]
 
             # Set the ray based on the current pixel of the camera
-            set_ray!(intersections.ray_camera, camera, Tuple(indices), thread_id)
+            set_ray!(ray_camera_loc, ray_camera_dir, camera, Tuple(indices))
 
             # Calculate shape intersections
             for intersector! in values(intersectors)
-                intersector!(intersections, thread_id)
-            end
-
-            # Apply shading
-            t_intersect[indices] = intersections.t[thread_id]
-            if cam_is_source
-                cam_is_source!(
-                    camera,
-                    intersections.t,
-                    intersections.name_intersected[thread_id],
-                    Tuple(indices),
-                    thread_id,
+                intersector!(
+                    t,
+                    ray_loc,
+                    ray_dir,
+                    ray_camera_loc,
+                    ray_camera_dir,
+                    cache_int,
+                    cache_float,
+                    name_intersected,
                 )
             end
 
-            set_color!(camera, intersections, texturers, Tuple(indices), thread_id)
-            reset_intersection!(intersections, thread_id)
+            # Apply shading
+            t_intersect[indices] = t[1]
+            if cam_is_source
+                cam_is_source!(camera, t, Tuple(indices))
+            end
+
+            set_color!(
+                camera,
+                color,
+                texturers,
+                name_intersected[1],
+                Tuple(indices),
+                cache_int,
+                cache_float,
+            )
         end
     end
 

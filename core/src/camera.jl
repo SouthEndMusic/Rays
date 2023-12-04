@@ -194,9 +194,9 @@ Construct a ray.
 """
 function Ray(
     n::Int;
-    vector_prototype::AbstractVector{F} where {F<:AbstractFloat} = zeros(Float32, 3),
+    matrix_prototype::AbstractMatrix{F} where {F<:AbstractFloat} = zeros(Float32, 3, 3),
 )::Ray
-    return Ray(similar(vector_prototype, (n, 3)), similar(vector_prototype, (n, 3)))
+    return Ray(similar(matrix_prototype, (n, 3)), similar(matrix_prototype, (n, 3)))
 end
 
 """
@@ -204,11 +204,11 @@ Compute the location and direction of a ray emited from the camera for
 the given pixel indices.
 """
 function set_ray!(
-    rays::Ray{MF},
+    ray_loc::AbstractVector{F},
+    ray_dir::AbstractVector{F},
     camera::Camera{F},
     pixel_indices::Tuple{Int,Int},
-    threadid::Int,
-)::Nothing where {F,MF}
+)::Nothing where {F}
     (; screen_dist, screen_size, screen_res, dir, loc, up, right, warp!) = camera
 
     screen_dist = screen_dist[1]
@@ -216,9 +216,6 @@ function set_ray!(
     i, j = pixel_indices
     s_h, s_w = screen_size
     res_h, res_w = screen_res
-
-    ray_loc = view(rays.loc, threadid, :)
-    ray_dir = view(rays.dir, threadid, :)
 
     @. ray_loc = loc + screen_dist * dir
     @. ray_loc -= ((i - 1) / (res_h - 1) - 0.5) * s_h * up

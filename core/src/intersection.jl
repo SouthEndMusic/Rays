@@ -2,12 +2,7 @@
 Object that holds all information of the intersections of rays
 with shapes.
 """
-struct Intersection{
-    F<:AbstractFloat,
-    VF<:AbstractVector{F},
-    MF<:AbstractMatrix{F},
-    MI<:AbstractMatrix{Int},
-}
+struct Intersection{F<:AbstractFloat,MF<:AbstractMatrix{F},MI<:AbstractMatrix{Int}}
     # A ray as it comes from the camera
     ray_camera::Ray{MF}
     # A ray as affine transformed for a shape
@@ -15,9 +10,9 @@ struct Intersection{
     # For fractalshape intersections
     ray_transformed::Ray{MF}
     # Intersection time
-    t::VF
+    t::MF
     # Name of intersected shape
-    name_intersected::Vector{Symbol}
+    name_intersected::Matrix{Symbol}
     # For integer intersection computations
     cache_int::MI
     # For floating point intersection computations
@@ -35,26 +30,50 @@ function Intersection(
     n_intersections::Int;
     size_cache_int::Int = 1,
     size_cache_float::Int = 12,
-    vector_prototype::AbstractVector{F} where {F<:AbstractFloat} = zeros(Float32, 3),
+    matrix_prototype::AbstractMatrix{F} where {F<:AbstractFloat} = zeros(Float32, 3, 3),
 )::Intersection
     return Intersection(
-        Ray(n_intersections; vector_prototype), # ray_camera
-        Ray(n_intersections; vector_prototype), # ray
-        Ray(n_intersections; vector_prototype), # ray_transformed
-        similar(vector_prototype, n_intersections), # t
-        fill(:none, n_intersections), # name_intersected
-        similar(vector_prototype, Int, (n_intersections, size_cache_int)), # int_metadata_int
-        similar(vector_prototype, (n_intersections, size_cache_float)), # int_metadata_float
-        similar(vector_prototype, (n_intersections, 3)), # color
+        Ray(n_intersections; matrix_prototype), # ray_camera
+        Ray(n_intersections; matrix_prototype), # ray
+        Ray(n_intersections; matrix_prototype), # ray_transformed
+        similar(matrix_prototype, (n_intersections, 1)), # t
+        fill(:none, (n_intersections, 1)), # name_intersected
+        similar(matrix_prototype, Int, (n_intersections, size_cache_int)), # int_metadata_int
+        similar(matrix_prototype, (n_intersections, size_cache_float)), # int_metadata_float
+        similar(matrix_prototype, (n_intersections, 3)), # color
     )
+end
+
+function get_caches(intersections::Intersection, index::Int)
+    ray_loc = view(intersections.ray.loc, index, :)
+    ray_dir = view(intersections.ray.dir, index, :)
+    ray_camera_loc = view(intersections.ray_camera.loc, index, :)
+    ray_camera_dir = view(intersections.ray_camera.dir, index, :)
+    t = view(intersections.t, index, :)
+    cache_int = view(intersections.cache_int, index, :)
+    cache_float = view(intersections.cache_float, index, :)
+    color = view(intersections.color, index, :)
+    name_intersected = view(intersections.name_intersected, index, :)
+    return ray_loc,
+    ray_dir,
+    ray_camera_loc,
+    ray_camera_dir,
+    t,
+    cache_int,
+    cache_float,
+    color,
+    name_intersected
 end
 
 """
 Set the intersection to a non-intersected state.
 """
-function reset_intersection!(intersection::Intersection, index::Int)::Nothing
-    intersection.t[index] = Inf
-    intersection.name_intersected[index] = :none
+function reset_intersection!(
+    t::AbstractVector,
+    name_intersected::AbstractVector{Symbol},
+)::Nothing
+    t[1] = Inf
+    name_intersected[1] = :none
     return nothing
 end
 
