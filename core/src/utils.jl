@@ -1,3 +1,37 @@
+const TypedSubArray = SubArray{
+    T,
+    1,
+    MT,
+    Tuple{Int64,Base.Slice{Base.OneTo{Int64}}},
+    true,
+} where {T,MT<:AbstractMatrix{T}}
+const Intersector = FunctionWrapper{
+    Nothing,
+    Tuple{VFS,VFS,VFS,VFS,VFS,VIS,VFS,TypedSubArray{Symbol,Matrix{Symbol}}},
+} where {
+    VFS<:TypedSubArray{F,MF} where {F<:AbstractFloat,MF<:AbstractMatrix{F}},
+    VIS<:TypedSubArray{Int,MI} where {MI<:AbstractMatrix{Int}},
+}
+const Texturer = FunctionWrapper{
+    Nothing,
+    Tuple{VFS,VIS,VFS},
+} where {
+    VFS<:TypedSubArray{F,MF} where {F<:AbstractFloat,MF<:AbstractMatrix{F}},
+    VIS<:TypedSubArray{Int,MI} where {MI<:AbstractMatrix{Int}},
+}
+
+const ScalarFunc = FunctionWrapper{F,Tuple{F}} where {F<:AbstractFloat}
+const Transform = FunctionWrapper{
+    Nothing,
+    Tuple{TypedSubArray{F,MF}},
+} where {F<:AbstractFloat,MF<:AbstractMatrix{F}}
+const ScalarField = FunctionWrapper{
+    F,
+    Tuple{TypedSubArray{F,MF}},
+} where {F<:AbstractFloat,MF<:AbstractMatrix{F}}
+const VectorField =
+    FunctionWrapper{Nothing,Tuple{Vector{F},Vector{F}}} where {F<:AbstractFloat}
+
 mutable struct Dtimer{F<:AbstractFloat}
     t::F
 end

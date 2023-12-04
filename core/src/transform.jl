@@ -109,31 +109,32 @@ Apply an affine transformation on the source ray and store the result
 in the destination ray.
 """
 function forward_transform!(
-    ray_dst::Ray{MF},
-    ray_src::Ray{MF},
+    loc_dst::VF,
+    dir_dst::VF,
+    loc_src::VF,
+    dir_src::VF,
+    vec_temp::AbstractVector{F},
     transform::AffineTransform{F},
-    tread_id::Int;
-    vec_temp::Union{MF,Nothing} = nothing,
-)::Nothing where {F,MF}
+)::Nothing where {F,VF}
     (; scaling, rotation, translation) = transform
-    if ray_src !== ray_dst
-        copyto!(ray_dst.loc, ray_src.loc)
-        copyto!(ray_dst.dir, ray_src.dir)
+    if loc_src != loc_dst
+        copyto!(loc_dst, loc_src)
+        copyto!(dir_dst, dir_src)
     end
 
     if !ismissing(rotation)
-        mul!(vec_temp, rotation, ray_dst.loc)
-        copyto!(ray_dst.loc, temp_vector)
-        mul!(vec_temp, rotation, ray_dst.dir)
-        copyto!(ray_dst.dir, temp_vector)
+        mul!(vec_temp, rotation, loc_dst)
+        copyto!(loc_dst, temp_vector)
+        mul!(vec_temp, rotation, dir_dst)
+        copyto!(dir_dst, temp_vector)
     end
     if !ismissing(scaling)
         for i ∈ 1:3
-            ray_dst.loc[i] *= scaling
+            loc_dst[i] *= scaling
         end
     end
     if !ismissing(translation)
-        ray_dst.loc .+= view(translation, :)
+        loc_dst .+= view(translation, :)
     end
     return nothing
 end
@@ -147,7 +148,7 @@ function inverse_transform!(
     dir_dst::VF,
     loc_src::VF,
     dir_src::VF,
-    vec_temp::VF,
+    vec_temp::AbstractVector{F},
     transform::AffineTransform{F},
 )::Nothing where {F,VF}
     (; scaling, rotation_inverse, translation) = transform
