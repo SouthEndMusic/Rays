@@ -123,21 +123,26 @@ the texture of the intersected shape.
 If no intersection was found, set the color to black.
 """
 function set_color!(
-    camera::Camera{F},
-    color::VF,
-    texturers::Dict,
+    color::AbstractVector{F},
+    camera::Camera{F,FC,MF},
+    ray_loc::AbstractVector{F},
+    ray_dir::AbstractVector{F},
+    t::AbstractVector{F},
+    scene::Scene{F},
     name_intersected::Symbol,
     pixel_indices::Tuple{Int,Int},
     cache_int::VI,
     cache_float::VF,
-)::Nothing where {F,VF<:AbstractVector{F},VI<:AbstractVector{Int}}
+)::Nothing where {F,VF<:AbstractVector{F},VI<:AbstractVector{Int},FC,MF}
     (; canvas) = camera
+    (; texturers) = scene
 
     # Get texture color
     if name_intersected == :none
         color .= zero(F)
     else
-        texturers[name_intersected](color, cache_int, cache_float)
+        texturer! = texturers[name_intersected]
+        texturer!(color, cache_int, cache_float, ray_loc, ray_dir, t)
     end
 
     # Set texture color
@@ -215,9 +220,12 @@ function render!(
             end
 
             set_color!(
-                camera,
                 color,
-                texturers,
+                camera,
+                ray_camera_loc,
+                ray_camera_dir,
+                t,
+                scene,
                 name_intersected[1],
                 Tuple(indices),
                 cache_int,

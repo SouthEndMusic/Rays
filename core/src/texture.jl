@@ -18,7 +18,7 @@ A texture where an integer is given a color.
 The shape of the mapping is (3, n_colors).
 """
 struct IntegerMappingTexture{F} <: Texture{F}
-    mapping::Matrix{F}
+    mapping::AbstractMatrix{F}
 end
 
 function Base.show(io::IO, texture::IntegerMappingTexture)::Nothing
@@ -32,8 +32,8 @@ end
 A texture where each point in 3D space is assigned a color
 with the (in place) vector function field!.
 """
-struct ColorFieldTexture{F} <: Texture{F}
-    field!::VectorField{F}
+struct ColorFieldTexture{F<:AbstractFloat,MF<:AbstractMatrix{F}} <: Texture{F}
+    field!::VectorField{F,MF}
 end
 
 function Base.show(io::IO, texture::ColorFieldTexture)::Nothing
@@ -45,8 +45,12 @@ end
 """
 Construct a color field texture.
 """
-function ColorFieldTexture(field!::Function; F = Float32)::ColorFieldTexture
-    return ColorFieldTexture(VectorField{F}(field!))
+function ColorFieldTexture(
+    field!::Function;
+    matrix_prototype::MF = zeros(Float32, 3, 3),
+)::ColorFieldTexture where {MF<:AbstractMatrix{F} where {F<:AbstractFloat}}
+    F = eltype(MF)
+    return ColorFieldTexture(VectorField{F,MF}(field!))
 end
 
 """
@@ -56,6 +60,9 @@ function color!(
     color::AbstractVector{F},
     cache_int::AbstractVector{Int},
     cache_float::AbstractVector{F},
+    ray_loc::AbstractVector{F},
+    ray_dir::AbstractVector{F},
+    t::AbstractVector{F},
     texture::UniformTexture,
 )::Nothing where {F}
     color .= view(texture.color, :)
@@ -69,6 +76,9 @@ function color!(
     color::AbstractVector{F},
     cache_int::AbstractVector{Int},
     cache_float::AbstractVector{F},
+    ray_loc::AbstractVector{F},
+    ray_dir::AbstractVector{F},
+    t::AbstractVector{F},
     texture::IntegerMappingTexture,
 )::Nothing where {F}
     (; mapping) = texture
@@ -83,11 +93,15 @@ function color!(
     color::AbstractVector{F},
     cache_int::AbstractVector{Int},
     cache_float::AbstractVector{F},
+    ray_loc::AbstractVector{F},
+    ray_dir::AbstractVector{F},
+    t::AbstractVector{F},
     texture::ColorFieldTexture,
 )::Nothing where {F}
-    loc_int .= view(dir, :)
+    loc_int = view(cache_float, 1:3)
+    loc_int .= view(ray_dir, :)
     loc_int .*= t[1]
-    loc_int .+= view(loc, :)
+    loc_int .+= view(ray_loc, :)
 
     texture.field!(color, loc_int)
     return nothing
