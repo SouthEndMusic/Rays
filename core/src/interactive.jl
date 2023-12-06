@@ -42,7 +42,7 @@ function Interactor(
         window_name,
         SDL.SDL_WINDOWPOS_CENTERED,
         SDL.SDL_WINDOWPOS_CENTERED,
-        camera_main.screen_res...,
+        get_screen_res(camera_main)...,
         SDL.SDL_WINDOW_SHOWN,
     )
     SDL.SDL_SetWindowResizable(window, false)
