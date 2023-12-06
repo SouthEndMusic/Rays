@@ -68,10 +68,10 @@ function rotation(axis::Vector{F}, θ::F)::AffineTransform{F} where {F}
 end
 
 """
-Define the * operator for composing (combining) 
+Define the "∘" (\\circ<tab>) operator for composing (combining) 
 2 affine transformations.
 """
-function Base.:*(
+function Base.:∘(
 	transform_second::AffineTransform{F},
 	transform_first::AffineTransform{F},
 )::AffineTransform{F} where {F}

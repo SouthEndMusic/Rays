@@ -1,5 +1,7 @@
 const TypedSubArray =
 	SubArray{T, 1, MT, Tuple{Int64, ST}, true} where {T, MT <: AbstractMatrix{T}, ST}
+
+# Wrapper around intersection functionality of a shape, for type stability
 const Intersector = FunctionWrapper{
 	Nothing,
 	Tuple{VFS, VFS, VFS, VFS, VFS, VIS, VFS, TypedSubArray{Symbol, Matrix{Symbol}, Base.Slice{Base.OneTo{Int64}}}},
@@ -15,6 +17,8 @@ const Intersector = FunctionWrapper{
 		Base.Slice{Base.OneTo{Int64}},
 	} where {MI <: AbstractMatrix{Int}},
 }
+
+# Wrapper around texturing functionality of a shape, for type stability
 const Texturer = FunctionWrapper{
 	Nothing,
 	Tuple{VFS, VIS, VFS, VFS, VFS, VFS},
@@ -31,15 +35,22 @@ const Texturer = FunctionWrapper{
 	} where {MI <: AbstractMatrix{Int}},
 }
 
+# Type stable function wrapper: R ↦ R
 const ScalarFunc = FunctionWrapper{F, Tuple{F}} where {F <: AbstractFloat}
+
+# Type stable function wrapper: R^n ↦ R^n (in-place)
 const Transform = FunctionWrapper{
 	Nothing,
 	Tuple{TypedSubArray{F, MF, ST}},
 } where {F <: AbstractFloat, MF <: AbstractMatrix{F}, ST}
+
+# Type stable function wrapper: R^n ↦ R
 const ScalarField = FunctionWrapper{
 	F,
 	Tuple{TypedSubArray{F, MF, ST}},
 } where {ST, F <: AbstractFloat, MF <: AbstractMatrix{F}}
+
+# Type stable function wrapper: R^n ↦ R^n (in-place on first function argument)
 const VectorField = FunctionWrapper{
 	Nothing,
 	Tuple{
