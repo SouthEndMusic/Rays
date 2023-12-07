@@ -90,7 +90,7 @@ function add_depth_of_field!(camera::Camera{F})::Nothing where {F}
 	CI = CartesianIndices(get_screen_res(camera))
 	numel = prod(get_screen_res(camera))
 
-	@threads for c ∈ 1:n_chunks
+	@batch for c ∈ 1:n_chunks
 		for I_flat ∈ c:n_chunks:numel
 			I = CI[I_flat]
 			if isinf(t_intersect[I])
@@ -149,6 +149,30 @@ function set_color!(
 	return nothing
 end
 
+function combine_intersectors(intersectors)
+	return intersectors!(t,
+		ray_loc,
+		ray_dir,
+		ray_camera_loc,
+		ray_camera_dir,
+		cache_int,
+		cache_float,
+		name_intersected) = begin
+		for intersector! ∈ values(intersectors)
+			intersector!(
+				t,
+				ray_loc,
+				ray_dir,
+				ray_camera_loc,
+				ray_camera_dir,
+				cache_int,
+				cache_float,
+				name_intersected,
+			)
+		end
+	end
+end
+
 """
 The main loop over pixels voor rendering.
 """
@@ -180,7 +204,9 @@ function render!(
 	# Reset the canvas
 	canvas .= one(F)
 
-	@threads for task ∈ 1:n_tasks
+	intersectors! = combine_intersectors(intersectors)
+
+	@batch for task ∈ 1:n_tasks
 		ray_loc,
 		ray_dir,
 		ray_camera_loc,
@@ -199,18 +225,16 @@ function render!(
 			set_ray!(ray_camera_loc, ray_camera_dir, camera, Tuple(indices))
 
 			# Calculate shape intersections
-			for intersector! ∈ values(intersectors)
-				intersector!(
-					t,
-					ray_loc,
-					ray_dir,
-					ray_camera_loc,
-					ray_camera_dir,
-					cache_int,
-					cache_float,
-					name_intersected,
-				)
-			end
+			intersectors!(
+				t,
+				ray_loc,
+				ray_dir,
+				ray_camera_loc,
+				ray_camera_dir,
+				cache_int,
+				cache_float,
+				name_intersected,
+			)
 
 			# Apply shading
 			t_intersect[indices] = t[1]

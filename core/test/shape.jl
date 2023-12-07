@@ -21,7 +21,6 @@ using LinearAlgebra: normalize!, norm
 	color,
 	name_intersected = Rays.get_caches(intersection, 1)
 
-
 	ray_camera_loc .= 0.0
 	ray_camera_dir .= 1.0
 	normalize!(ray_camera_dir)
