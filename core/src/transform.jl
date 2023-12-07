@@ -103,6 +103,9 @@ function Base.:∘(
 	return AffineTransform(scaling, rotation, rotation_inverse, translation)
 end
 
+"""
+In-place forward application of an affine transform
+"""
 function forward_transform!(
 	loc_dst::VF,
 	dir_dst::VF,
@@ -127,8 +130,7 @@ function forward_transform!(
 end
 
 """
-Apply an affine transformation on the source ray and store the result
-in the destination ray.
+Not in-place forward application of an affine transform
 """
 function forward_transform!(
 	loc_dst::VF,
@@ -144,6 +146,9 @@ function forward_transform!(
 	return nothing
 end
 
+"""
+In-place inverse application of an affine transform
+"""
 function inverse_transform!(
 	loc_dst::VF,
 	dir_dst::VF,
@@ -168,8 +173,7 @@ function inverse_transform!(
 end
 
 """
-Apply the inverse of an affine transform on the source ray and store
-the results in the destination ray.
+Not in-place inverse application of an affine transform
 """
 function inverse_transform!(
 	loc_dst::VF,
