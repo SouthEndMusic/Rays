@@ -187,10 +187,14 @@ tol: The tolerance of approximating a zero of f:
 itermax: The maximum amount of Newton iterations used to find 
 	a zero of f along a ray within the specified tolerance
 """
-struct ImplicitSurface{F,VF<:Union{VectorField{F},Nothing}} <: Shape{F}
+struct ImplicitSurface{
+    F<:AbstractFloat,
+    MF<:AbstractMatrix{F},
+    VecF<:Union{VectorField{TypedSubArray{F,MF,Base.Slice{Base.OneTo{Int64}}}},Nothing},
+} <: Shape{F}
     name::Symbol
-    f::ScalarField{F}
-    ∇f!::VF
+    f::ScalarField{UnitRange{Int64},F,MF}
+    ∇f!::VecF
     R_bound::F
     n_divisions::Int
     tol::F
@@ -209,7 +213,8 @@ function ImplicitSurface(
     itermax::Int = 10,
     n_divisions::Int = 3,
     tol::Union{F,Nothing} = nothing,
-)::ImplicitSurface{F} where {F}
+    vector_prototype::AbstractVector{F} = zeros(Float32, 3),
+)::ImplicitSurface where {F<:AbstractFloat}
     if isnothing(name)
         name = snake_case_name(ImplicitSurface)
     end
@@ -220,10 +225,13 @@ function ImplicitSurface(
         tol = convert(F, 1e-3)
     end
 
+    VF = typeof(vector_prototype)
+    MF = typeof(similar(vector_prototype, (3, 3)))
+    ST = UnitRange{Int64}
     return ImplicitSurface(
         name,
-        ScalarField{F}(f),
-        isnothing(∇f!) ? nothing : VectorField{F}(∇f!),
+        ScalarField{ST,F,MF}(f),
+        isnothing(∇f!) ? nothing : VectorField{F,VF}(∇f!),
         R_bound,
         n_divisions,
         tol,
