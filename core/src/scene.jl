@@ -45,8 +45,8 @@ function clear_shapes!(scene::Scene)::Nothing
 	return nothing
 end
 
-function Base.show(io::IO, scene::Scene)::Nothing
-	println(io, typeof(scene))
+function Base.show(io::IO, scene::Scene{F, MF})::Nothing where {F, MF}
+	println(io, "Scene (array type $MF):")
 	println(io, "* Cameras:")
 	for camera ∈ values(scene.cameras)
 		println(io, "\t", camera)

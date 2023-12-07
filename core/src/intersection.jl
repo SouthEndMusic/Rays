@@ -32,11 +32,13 @@ function Intersection(
 	size_cache_float::Int = 12,
 	matrix_prototype::AbstractMatrix{F} where {F <: AbstractFloat} = zeros(Float32, 3, 3),
 )::Intersection
+	t = similar(matrix_prototype, (n_intersections, 1))
+	t .= Inf
 	return Intersection(
 		Ray(n_intersections; matrix_prototype), # ray_camera
 		Ray(n_intersections; matrix_prototype), # ray
 		Ray(n_intersections; matrix_prototype), # ray_transformed
-		similar(matrix_prototype, (n_intersections, 1)), # t
+		t,
 		fill(:none, (n_intersections, 1)), # name_intersected
 		similar(matrix_prototype, Int, (n_intersections, size_cache_int)), # int_metadata_int
 		similar(matrix_prototype, (n_intersections, size_cache_float)), # int_metadata_float
@@ -220,7 +222,7 @@ function _intersect_ray!(
 		vec_temp = view(cache_float, 1:3)
 	end
 
-	for subshape_transform in subshape_transforms
+	for subshape_transform ∈ subshape_transforms
 		t[1] /= subshape_transform.scaling
 		inverse_transform!(ray_loc, ray_dir, vec_temp, subshape_transform)
 		if _intersect_ray!(t, cache_int, cache_float, ray_loc, ray_dir, shape)
