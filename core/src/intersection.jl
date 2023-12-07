@@ -23,7 +23,7 @@ struct Intersection{F <: AbstractFloat, MF <: AbstractMatrix{F}, MI <: AbstractM
 end
 
 """
-Get default values for the metadata of the intersection of
+Get default values for the metadata of intersections of
 a certain shape for when there is no intersection.
 """
 function Intersection(
@@ -46,6 +46,10 @@ function Intersection(
 	)
 end
 
+"""
+Get views of the arrays in an intersection object used for
+the computations for one ray.
+"""
 function get_caches(intersections::Intersection, index::Int)
 	ray_loc = view(intersections.ray.loc, index, :)
 	ray_dir = view(intersections.ray.dir, index, :)
@@ -68,7 +72,7 @@ function get_caches(intersections::Intersection, index::Int)
 end
 
 """
-Set the intersection to a non-intersected state.
+Set the data to a non-intersected state.
 """
 function reset_intersection!(
 	t::AbstractVector,
