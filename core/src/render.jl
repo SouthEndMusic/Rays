@@ -150,14 +150,16 @@ function set_color!(
 end
 
 function combine_intersectors(intersectors)
-	return intersectors!(t,
+	return intersectors!(
+		t,
 		ray_loc,
 		ray_dir,
 		ray_camera_loc,
 		ray_camera_dir,
 		cache_int,
 		cache_float,
-		name_intersected) = begin
+		name_intersected,
+	) = begin
 		for intersector! ∈ values(intersectors)
 			intersector!(
 				t,
