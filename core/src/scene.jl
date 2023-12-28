@@ -145,30 +145,31 @@ function create_intersector(
 	VFS = TypedSubArray{F, MF, ST}
 	MI = typeof(similar(matrix_prototype, Int))
 	VIS = TypedSubArray{Int, MI, ST}
-	intersector! = (
-		t,
-		ray_loc,
-		ray_dir,
-		ray_camera_loc,
-		ray_camera_dir,
-		cache_int,
-		cache_float,
-		name_intersected,
-	) -> begin
-		inverse_transform!(
+	intersector! =
+		(
+			t,
 			ray_loc,
 			ray_dir,
 			ray_camera_loc,
 			ray_camera_dir,
-			view(cache_float, 1:3),
-			transform,
-		)
-		if _intersect_ray!(t, cache_int, cache_float, ray_loc, ray_dir, shape)
-			name_intersected[1] = shape.name
-			transform_t!(t, transform)
+			cache_int,
+			cache_float,
+			name_intersected,
+		) -> begin
+			inverse_transform!(
+				ray_loc,
+				ray_dir,
+				SVector{3, F}(ray_camera_loc),
+				SVector{3, F}(ray_camera_dir),
+				view(cache_float, 1:3),
+				transform,
+			)
+			if _intersect_ray!(t, cache_int, cache_float, ray_loc, ray_dir, shape)
+				name_intersected[1] = shape.name
+				transform_t!(t, transform)
+			end
+			return nothing
 		end
-		return nothing
-	end
 	return Intersector{VFS, VIS}(intersector!)
 end
 
@@ -189,12 +190,7 @@ function create_texturer(
 		(color, cache_int, cache_float, ray_camera_loc, ray_camera_dir, t) -> begin
 			if texture isa ColorFieldTexture
 				vec_temp = view(cache_float, 1:3)
-				inverse_transform!(
-					ray_camera_loc,
-					ray_camera_dir,
-					vec_temp,
-					transform,
-				)
+				inverse_transform!(ray_camera_loc, ray_camera_dir, vec_temp, transform)
 			end
 			color!(
 				color,

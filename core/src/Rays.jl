@@ -4,10 +4,11 @@ import SimpleDirectMediaLayer as SDL
 
 using Accessors: @set
 using Base.Threads: nthreads, threadid
-using Polyester
 using FunctionWrappers: FunctionWrapper
 using LinearAlgebra: cross, normalize, normalize!, norm, dot, transpose!, mul!
+using Polyester
 using SimpleDirectMediaLayer.LibSDL2
+using StaticArrays
 
 include("utils.jl")
 include("camera.jl")

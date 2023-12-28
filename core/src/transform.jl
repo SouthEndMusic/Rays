@@ -7,8 +7,8 @@ and a translation.
 struct AffineTransform{
 	F <: AbstractFloat,
 	S <: Union{F, Missing},
-	R <: Union{Matrix{F}, Missing},
-	T <: Union{Vector{F}, Missing},
+	R <: Union{AbstractMatrix{F}, Missing},
+	T <: Union{AbstractVector{F}, Missing},
 } <: RayTransform{F}
 	scaling::S
 	rotation::R
@@ -133,13 +133,13 @@ end
 Not in-place forward application of an affine transform
 """
 function forward_transform!(
-	loc_dst::VF,
-	dir_dst::VF,
-	loc_src::VF,
-	dir_src::VF,
+	loc_dst::VF1,
+	dir_dst::VF1,
+	loc_src::VF2,
+	dir_src::VF2,
 	vec_temp::AbstractVector{F},
 	transform::AffineTransform{F},
-)::Nothing where {F, VF}
+)::Nothing where {F, VF1, VF2}
 	copyto!(loc_dst, loc_src)
 	copyto!(dir_dst, dir_src)
 	forward_transform!(loc_dst, dir_dst, vec_temp, transform)
@@ -176,13 +176,13 @@ end
 Not in-place inverse application of an affine transform
 """
 function inverse_transform!(
-	loc_dst::VF,
-	dir_dst::VF,
-	loc_src::VF,
-	dir_src::VF,
+	loc_dst::VF1,
+	dir_dst::VF1,
+	loc_src::VF2,
+	dir_src::VF2,
 	vec_temp::AbstractVector{F},
 	transform::AffineTransform{F},
-)::Nothing where {F, VF}
+)::Nothing where {F, VF1, VF2}
 	copyto!(loc_dst, loc_src)
 	copyto!(dir_dst, dir_src)
 	inverse_transform!(loc_dst, dir_dst, vec_temp, transform)

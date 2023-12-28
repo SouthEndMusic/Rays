@@ -29,7 +29,7 @@ a certain shape for when there is no intersection.
 function Intersection(
 	n_intersections::Int;
 	size_cache_int::Int = 1,
-	size_cache_float::Int = 12,
+	size_cache_float::Int = 24,
 	matrix_prototype::AbstractMatrix{F} where {F <: AbstractFloat} = zeros(Float32, 3, 3),
 )::Intersection
 	t = similar(matrix_prototype, (n_intersections, 1))
@@ -154,7 +154,7 @@ function _intersect_ray!(
 		diff_bound_small = -cube.R - ray_loc[dim]
 		dir_dim_positive = (ray_dir[dim] > 0) # dir_dim = 0 not taken into account
 
-		if diff_bound_small > 0.0
+		if diff_bound_small > zero(F)
 			if dir_dim_positive
 				t_int_candidate = diff_bound_small / ray_dir[dim]
 			else
@@ -208,6 +208,68 @@ function _intersect_ray!(
 	return closer_intersection_found
 end
 
+# function _intersect_ray!(
+# 	t::AbstractVector{F},
+# 	cache_int::AbstractVector{Int},
+# 	cache_float::AbstractVector{F},
+# 	ray_loc::AbstractVector{F},
+# 	ray_dir::AbstractVector{F},
+# 	fractal_shape::FractalShape{F, S, T};
+# 	current_depth::Int = 1,
+# 	vec_temp::Union{AbstractVector{F}, Nothing} = nothing,
+# )::Bool where {F, S, T}
+# 	(; depth, shape, subshape_transforms) = fractal_shape
+# 	closer_intersection_found = false
+# 	t[1] = Inf
+
+# 	if isnothing(vec_temp)
+# 		vec_temp = view(cache_float, 1:3)
+# 	end
+
+# 	ray_loc_local = SVector{3}(ray_loc)
+# 	ray_dir_local = SVector{3}(ray_dir)
+
+# 	for subshape_transform ∈ subshape_transforms
+# 		t[1] /= subshape_transform.scaling
+# 		inverse_transform!(ray_loc, ray_dir, ray_loc_local, ray_dir_local, vec_temp, subshape_transform)
+# 		if _intersect_ray!(t, cache_int, cache_float, ray_loc, ray_dir, shape)
+# 			if current_depth < depth
+# 				if _intersect_ray!(
+# 					t,
+# 					cache_int,
+# 					cache_float,
+# 					ray_loc,
+# 					ray_dir,
+# 					fractal_shape;
+# 					current_depth = current_depth + 1,
+# 					vec_temp,
+# 				)
+# 					closer_intersection_found = true
+# 				end
+# 			else
+# 				closer_intersection_found = true
+# 			end
+# 		end
+# 		t[1] *= subshape_transform.scaling
+# 	end
+# 	return closer_intersection_found
+# end
+
+function next_index(vec::AbstractVector{F}, i::Int)::Int where {F <: AbstractFloat}
+	val_old = i == 0 ? -Inf : vec[i]
+	val_new = Inf
+	i_new = 0
+	for j ∈ eachindex(vec)
+		if j == i
+			continue
+		elseif val_old < vec[j] < val_new
+			val_new = vec[j]
+			i_new = j
+		end
+	end
+	return i_new
+end
+
 function _intersect_ray!(
 	t::AbstractVector{F},
 	cache_int::AbstractVector{Int},
@@ -216,39 +278,61 @@ function _intersect_ray!(
 	ray_dir::AbstractVector{F},
 	fractal_shape::FractalShape{F, S, T};
 	current_depth::Int = 1,
-	vec_temp::Union{AbstractVector{F}, Nothing} = nothing,
 )::Bool where {F, S, T}
-	(; depth, shape, subshape_transforms) = fractal_shape
-	closer_intersection_found = false
-	t[1] = Inf
+	(; subshape_transforms, shape, depth, vector_prototype) = fractal_shape
 
-	if isnothing(vec_temp)
-		vec_temp = view(cache_float, 1:3)
+	vec_temp = view(cache_float, 1:3)
+	t_subshapes = view(cache_float, 4:(length(subshape_transforms)+3))
+
+	ray_loc_local = SVector{3, F}(ray_loc)
+	ray_dir_local = SVector{3, F}(ray_dir)
+
+	is_deepest = (current_depth == depth)
+
+	closer_intersection_found = false
+
+	for (i, subshape_transform) ∈ enumerate(subshape_transforms)
+		inverse_transform!(ray_loc, ray_dir, ray_loc_local, ray_dir_local, vec_temp, subshape_transform)
+		t[1] = Inf
+		_intersect_ray!(t, cache_int, cache_float, SVector{3, F}(ray_loc), SVector{3, F}(ray_dir), shape)
+		t_subshapes[i] = t[1]
 	end
 
-	for subshape_transform ∈ subshape_transforms
-		t[1] /= subshape_transform.scaling
-		inverse_transform!(ray_loc, ray_dir, vec_temp, subshape_transform)
-		if _intersect_ray!(t, cache_int, cache_float, ray_loc, ray_dir, shape)
-			if current_depth < depth
-				if _intersect_ray!(
-					t,
-					cache_int,
-					cache_float,
-					ray_loc,
-					ray_dir,
-					fractal_shape;
-					current_depth = current_depth + 1,
-					vec_temp,
-				)
-					closer_intersection_found = true
-				end
-			else
+	if !is_deepest
+		t_subshapes_stack = convert(typeof(vector_prototype), t_subshapes)
+		subshape_index = 0
+
+		for _ ∈ eachindex(subshape_transforms)
+			subshape_index = next_index(t_subshapes_stack, subshape_index)
+			if subshape_index == 0 || t_subshapes_stack[subshape_index] == Inf
+				break
+			end
+			subshape_transform = subshape_transforms[subshape_index]
+			inverse_transform!(ray_loc, ray_dir, ray_loc_local, ray_dir_local, vec_temp, subshape_transform)
+			if _intersect_ray!(
+				t,
+				cache_int,
+				cache_float,
+				ray_loc,
+				ray_dir,
+				fractal_shape;
+				current_depth = current_depth + 1,
+			)
 				closer_intersection_found = true
+				break
 			end
 		end
-		forward_transform!(ray_loc, ray_dir, vec_temp, subshape_transform)
-		t[1] *= subshape_transform.scaling
+
+	else
+		subshape_intersect_index = argmin(t_subshapes)
+		if !isinf(t_subshapes[subshape_intersect_index])
+			subshape_transform = subshape_transforms[subshape_intersect_index]
+			inverse_transform!(ray_loc, ray_dir, ray_loc_local, ray_dir_local, vec_temp, subshape_transform)
+			t[1] = Inf
+			_intersect_ray!(t, cache_int, cache_float, ray_loc, ray_dir, shape)
+			t[1] *= subshape_transform.scaling^depth
+			closer_intersection_found = true
+		end
 	end
 	return closer_intersection_found
 end
