@@ -9,6 +9,10 @@ using LinearAlgebra: normalize!, norm
 	@test sphere isa Rays.Sphere
 	@test string(sphere) == "<Sphere 'sphere'>"
 
+	bounding_box = Rays.get_bounding_box(sphere)
+	@test bounding_box.coordinates_min ≈ Float32[-0.5, -0.5, -0.5]
+	@test bounding_box.coordinates_max ≈ Float32[0.5, 0.5, 0.5]
+
 	matrix_prototype = zeros(3, 3)
 	intersection = Rays.Intersection(1; matrix_prototype)
 	ray_loc,
@@ -24,7 +28,12 @@ using LinearAlgebra: normalize!, norm
 	ray_camera_loc .= 0.0
 	ray_camera_dir .= 1.0
 	normalize!(ray_camera_dir)
+
 	translation = Rays.translation(ones(3))
+	bounding_box = Rays.get_bounding_box(sphere; transform = translation)
+	@test bounding_box.coordinates_min ≈ Float32[0.5, 0.5, 0.5]
+	@test bounding_box.coordinates_max ≈ Float32[1.5, 1.5, 1.5]
+
 	intersector! = Rays.create_intersector(sphere, translation; matrix_prototype)
 	intersector!(
 		t,
@@ -62,6 +71,10 @@ end
 	@test cube isa Rays.Cube
 	@test string(cube) == "<Cube 'my_awesome_cube'>"
 
+	bounding_box = Rays.get_bounding_box(cube)
+	@test bounding_box.coordinates_min ≈ Float32[-0.5, -0.5, -0.5]
+	@test bounding_box.coordinates_max ≈ Float32[0.5, 0.5, 0.5]
+
 	matrix_prototype = zeros(3, 3)
 	intersection = Rays.Intersection(1; matrix_prototype)
 	ray_loc,
@@ -77,9 +90,13 @@ end
 	ray_camera_loc .= 0.0
 	ray_camera_dir .= [0.0, 1.0, 0.0]
 	normalize!(ray_camera_dir)
-	translation = Rays.translation([0.0, 2.0, 0.0])
-	intersector! = Rays.create_intersector(cube, translation; matrix_prototype)
 
+	translation = Rays.translation([0.0, 2.0, 0.0])
+	bounding_box = Rays.get_bounding_box(sphere; transform = translation)
+	@test bounding_box.coordinates_min ≈ Float32[-0.5, 1.5, -0.5]
+	@test bounding_box.coordinates_max ≈ Float32[0.5, 2.5, 0.5]
+
+	intersector! = Rays.create_intersector(cube, translation; matrix_prototype)
 	intersector!(
 		t,
 		ray_loc,
@@ -104,6 +121,10 @@ end
 	@test sponge isa Rays.FractalShape
 	@test string(sponge) ==
 		  "<FractalShape 'my_awesome_sponge'; 20 subshapes of <Cube 'cube'>>"
+
+	bounding_box = Rays.get_bounding_box(sponge)
+	@test bounding_box.coordinates_min ≈ Float32[-0.5, -0.5, -0.5]
+	@test bounding_box.coordinates_max ≈ Float32[0.5, 0.5, 0.5]
 
 	matrix_prototype = zeros(3, 3)
 	intersection = Rays.Intersection(1; matrix_prototype)
@@ -138,6 +159,10 @@ end
 	@test string(sphere) ==
 		  "<ImplicitSurface 'sphere'; function 'f' and finite difference gradient>"
 
+	bounding_box = Rays.get_bounding_box(sphere)
+	@test bounding_box.coordinates_min ≈ Float32[-0.55, -0.55, -0.55]
+	@test bounding_box.coordinates_max ≈ Float32[0.55, 0.55, 0.55]
+
 	matrix_prototype = zeros(3, 3)
 	intersection = Rays.Intersection(1; matrix_prototype)
 	ray_loc,
@@ -171,6 +196,10 @@ end
 	@test string(triangle) ==
 		  "<TriangleShape 'my_awesome_triangle'; with 3 vertices and 1 faces>"
 
+	bounding_box = Rays.get_bounding_box(triangle)
+	@test bounding_box.coordinates_min ≈ Float32[0, 0, 0]
+	@test bounding_box.coordinates_max ≈ Float32[1, 1, 0]
+
 	matrix_prototype = zeros(3, 3)
 	intersection = Rays.Intersection(1; matrix_prototype)
 	ray_loc,
@@ -201,6 +230,10 @@ end
 		Rays.RevolutionSurface(r, 1.0, -1.0, 1.0; tol = 1e-7, n_divisions = 50)
 	@test string(revolution_shape) ==
 		  "<RevolutionSurface 'revolution_surface'; function 'r' and finite difference derivative>"
+
+	bounding_box = Rays.get_bounding_box(revolution_shape)
+	@test bounding_box.coordinates_min ≈ Float32[-1, -1, -1]
+	@test bounding_box.coordinates_max ≈ Float32[1, 1, 1]
 
 	matrix_prototype = zeros(3, 3)
 	intersection = Rays.Intersection(1; matrix_prototype)
