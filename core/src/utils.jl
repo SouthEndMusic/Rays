@@ -89,3 +89,8 @@ end
 function identity_matrix(F)::Matrix
 	return F[1 0 0; 0 1 0; 0 0 1]
 end
+
+struct BoundingBox{F <: AbstractFloat}
+	coordinates_min::Vector{F}
+	coordinates_max::Vector{F}
+end

@@ -16,6 +16,7 @@ include("shape.jl")
 include("intersection.jl")
 include("texture.jl")
 include("scene.jl")
+include("partition.jl")
 include("render.jl")
 include("interactive.jl")
 
