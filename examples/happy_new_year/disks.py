@@ -60,7 +60,7 @@ cv2.waitKey(0)
 cv2.destroyAllWindows()
 
 if write_result:
-    with open(r"C:\Users\bart1\Documents\Julia_projects\Rays\experiments\happy_new_year\disks.csv", 'w') as f:
+    with open("disks.csv", 'w') as f:
         writer = csv.writer(f)
         writer.writerow(["center_x", "center_y", "radius"])
         for i in range(n_disks_total):
