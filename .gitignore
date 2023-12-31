@@ -11,5 +11,9 @@ experiments
 # formatting
 format.jl
 
+# Example stuffs
+examples/happy_new_year/*.csv
+examples/happy_new_year/*.jpg
+
 # Misc
 examples/ribasim/generated_testmodels
