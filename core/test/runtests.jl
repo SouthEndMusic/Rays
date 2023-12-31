@@ -6,4 +6,5 @@ using SafeTestsets: @safetestset
     @safetestset "shape" include("shape.jl")
     @safetestset "scene" include("scene.jl")
     @safetestset "render" include("render.jl")
+    @safetestset "partition" include("partition.jl")
 end
