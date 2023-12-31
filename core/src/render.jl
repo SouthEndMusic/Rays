@@ -149,15 +149,20 @@ function set_color!(
 	return nothing
 end
 
-function combine_intersectors(intersectors)
-	return intersectors!(t,
+"""
+Combine all intersectors into one function.
+"""
+function combine_intersectors(intersectors)::Function
+	return intersectors!(
+		t,
 		ray_loc,
 		ray_dir,
 		ray_camera_loc,
 		ray_camera_dir,
 		cache_int,
 		cache_float,
-		name_intersected) = begin
+		name_intersected,
+	) = begin
 		for intersector! ∈ values(intersectors)
 			intersector!(
 				t,
@@ -169,6 +174,52 @@ function combine_intersectors(intersectors)
 				cache_float,
 				name_intersected,
 			)
+		end
+	end
+end
+
+"""
+Intersect shapes efficiently based on the scene partition.
+"""
+function partition_intersector(scene::Scene)::Function
+	(; partition, intersectors) = scene
+	return intersector!(
+		t,
+		ray_loc,
+		ray_dir,
+		ray_camera_loc,
+		ray_camera_dir,
+		cache_int,
+		cache_float,
+		name_intersected,
+	) = begin
+		nodes_to_process = [1]
+		while !isempty(nodes_to_process)
+			node_index = pop!(nodes_to_process)
+			node = partition[node_index]
+			if bounding_box_intersect(ray_camera_loc, ray_camera_dir, node.bounding_box)
+				if isempty(node.children)
+					# Doing this instead of looping over node.shape_names
+					# prevents runtime dispatch
+					for (name, intersector!) ∈ intersectors
+						if name ∉ node.shape_names
+							continue
+						end
+						intersector!(
+							t,
+							ray_loc,
+							ray_dir,
+							ray_camera_loc,
+							ray_camera_dir,
+							cache_int,
+							cache_float,
+							name_intersected,
+						)
+					end
+				else
+					append!(nodes_to_process, node.children)
+				end
+			end
 		end
 	end
 end
@@ -204,7 +255,13 @@ function render!(
 	# Reset the canvas
 	canvas .= one(F)
 
-	intersectors! = combine_intersectors(intersectors)
+	# Combine all intersectors in one function, 
+	# this prevents runtime dispatch
+	if isempty(scene.partition)
+		intersectors! = combine_intersectors(intersectors)
+	else
+		intersectors! = partition_intersector(scene)
+	end
 
 	@batch for task ∈ 1:n_tasks
 		ray_loc,
