@@ -147,7 +147,7 @@ function Tetrahedron(R::F)::TriangleShape{F} where {F}
     vertices = zeros(F, 4, 3)
     vertices[4, :] .= [0.0, 0.0, R]
 
-    ϕ = 2π / 3
+    ϕ = π - acos(1 / 3)
     for (i, θ) ∈ enumerate(range(0, 2π, 4)[1:end-1])
         @. vertices[i, :] = R * [
             cos(θ) * sin(ϕ)
