@@ -58,7 +58,6 @@ function transform_bounding_box(
     transform::AffineTransform{F},
 )::BoundingBox{F} where {F}
     (; coordinates_min, coordinates_max) = bounding_box
-    (; scaling, rotation, translation) = transform
 
     # Get the coordinates of the vertices of the bounding box
     coordinates = hcat(coordinates_min, coordinates_max)
@@ -70,21 +69,7 @@ function transform_bounding_box(
     end
 
     # Apply the transform to the vertices of the bounding box
-    if !ismissing(scaling)
-        vertices *= scaling
-    end
-
-    if !ismissing(rotation)
-        for i ∈ 1:8
-            vertices[i, :] = rotation * vertices[i, :]
-        end
-    end
-
-    if !ismissing(translation)
-        for i ∈ 1:8
-            vertices[i, :] += translation
-        end
-    end
+    forward_transform!(vertices, transform)
 
     # Get the new bounding box from the transformed vertices
     coordinates_min_new = minimum(vertices, dims = 1)[:]
@@ -93,27 +78,29 @@ function transform_bounding_box(
 end
 
 """
-Get a partition of the scene in the scene.partition field.
-The algorithm starts with a bounding box around all shapes in the scene,
+Get a partition of the given bounding boxes.
+The algorithm starts with a bounding box around all objects,
 and then builds a tree structure of nested bounding boxes by 
 bisecting bounding boxes into 2 based on heuristics for the best splitting plane.
+partition: vector of nodes in the bisection tree
+bounding_boxes: dictionary identifier => bounding_box
+max_objects_per_node: stop bisecting if a bounding box contains at most this amount
+	of objects
+max_depth: maximum depth of the bisection tree
 """
-function partition_scene!(
-    scene::Scene{F};
-    max_shapes_per_node::Int = 3,
+function partition!(
+    partition::Vector{PartitionNode{F,T}},
+    bounding_boxes::Dict{T,BoundingBox{F}};
+    max_objects_per_node::Int = 3,
     max_depth::Int = 5,
-)::Nothing where {F}
-    (; shapes, partition) = scene
+)::Nothing where {F,T}
 
-    # Get the bounding boxes of all shapes in the scene
-    bounding_boxes::Dict{Symbol,BoundingBox{F}} =
-        Dict(name => get_bounding_box(scene, name) for (name, shape) ∈ shapes)
+    # Get the centers of all bounding boxes
+    bounding_box_centers::Dict{T,Vector{F}} = Dict(
+        identifier => center(bounding_box) for (identifier, bounding_box) ∈ bounding_boxes
+    )
 
-    # Get the centers of the bounding boxes of all shapes in the scene
-    bounding_box_centers::Dict{Symbol,Vector{F}} =
-        Dict(name => center(bounding_boxes[name]) for name ∈ keys(shapes))
-
-    # Compute the bounding box around all shapes in the scene
+    # Compute the bounding box around all objects
     coordinates_min = [
         minimum(
             bounding_box.coordinates_min[dim] for bounding_box ∈ values(bounding_boxes)
@@ -124,14 +111,14 @@ function partition_scene!(
             bounding_box.coordinates_max[dim] for bounding_box ∈ values(bounding_boxes)
         ) for dim ∈ 1:3
     ]
-    bounding_box_scene = BoundingBox(coordinates_min, coordinates_max)
+    bounding_box_outter = BoundingBox(coordinates_min, coordinates_max)
 
     # Remove previous partition if it exists
     empty!(partition)
 
     # Add the first node to the partition
-    node_first =
-        PartitionNode(bounding_box_scene, Int[], collect(keys(bounding_boxes)), 0, 0)
+    identifiers = collect(keys(bounding_boxes))
+    node_first = PartitionNode(bounding_box_outter, Int[], identifiers, 0, 0)
     push!(partition, node_first)
 
     # Stack of nodes to process
@@ -141,9 +128,13 @@ function partition_scene!(
         node_index = pop!(nodes_to_process)
         node = partition[node_index]
 
+        if isempty(node.identifiers)
+            continue
+        end
+
         # Compute the splitting dimension as the dimension along which there
         # is the highest variance in bounding box centers
-        variances = var([bounding_box_centers[name] for name ∈ node.shape_names])
+        variances = var([bounding_box_centers[name] for name ∈ node.identifiers])
         dim_split = argmax(variances)
 
         node = @set node.dim_split = dim_split
@@ -152,65 +143,121 @@ function partition_scene!(
         # Compute the position of the splitting plane as the median of the bounding box centers
         # of the shapes in this node in the splitting dimension
         coordinate_split =
-            median([bounding_box_centers[name][dim_split] for name ∈ node.shape_names])
+            median([bounding_box_centers[name][dim_split] for name ∈ node.identifiers])
 
-        # Compute to which of the child nodes each shape belongs
-        names_lower = Vector{Symbol}()
-        names_higher = Vector{Symbol}()
-        for name ∈ node.shape_names
-            if bounding_boxes[name].coordinates_min[dim_split] < coordinate_split
-                push!(names_lower, name)
+        # Compute to which of the child nodes each object belongs
+        identifiers_lower = Vector{T}()
+        identifiers_higher = Vector{T}()
+        for identifier ∈ node.identifiers
+            if bounding_boxes[identifier].coordinates_min[dim_split] < coordinate_split
+                push!(identifiers_lower, identifier)
             end
-            if bounding_boxes[name].coordinates_max[dim_split] > coordinate_split
-                push!(names_higher, name)
+            if bounding_boxes[identifier].coordinates_max[dim_split] > coordinate_split
+                push!(identifiers_higher, identifier)
             end
         end
 
         depth_new = node.depth + 1
 
         # The child node with bounding box on the lower side along the splitting dimension
-        node_lower = PartitionNode(
-            BoundingBox(
-                copy(node.bounding_box.coordinates_min),
-                copy(node.bounding_box.coordinates_max),
-            ),
-            Int[],
-            names_lower,
-            depth_new,
-            0,
-        )
-        node_lower.bounding_box.coordinates_max[dim_split] = coordinate_split
-        push!(partition, node_lower)
-        node_lower_index = length(partition)
-        push!(node.children, node_lower_index)
+        if length(identifiers_lower) > 0
+            node_lower = PartitionNode(
+                BoundingBox(
+                    copy(node.bounding_box.coordinates_min),
+                    copy(node.bounding_box.coordinates_max),
+                ),
+                Int[],
+                identifiers_lower,
+                depth_new,
+                0,
+            )
+            node_lower.bounding_box.coordinates_max[dim_split] = coordinate_split
+            push!(partition, node_lower)
+            node_lower_index = length(partition)
+            push!(node.child_indices, node_lower_index)
 
-        # If there are sufficient shapes in the child node and the maximum depth has not been exceeded,
-        # add the child node to the stack
-        if length(names_lower) > max_shapes_per_node && depth_new < max_depth
-            push!(nodes_to_process, node_lower_index)
+            # If there are sufficient shapes in the child node and the maximum depth has not been exceeded,
+            # add the child node to the stack
+            if length(identifiers_lower) > max_objects_per_node && depth_new < max_depth
+                push!(nodes_to_process, node_lower_index)
+            end
         end
 
         # The child node with bounding box on the higher side along the splitting dimension
-        node_higher = PartitionNode(
-            BoundingBox(
-                copy(node.bounding_box.coordinates_min),
-                copy(node.bounding_box.coordinates_max),
-            ),
-            Int[],
-            names_higher,
-            depth_new,
-            0,
-        )
-        node_higher.bounding_box.coordinates_min[dim_split] = coordinate_split
-        push!(partition, node_higher)
-        node_higher_index = length(partition)
-        push!(node.children, node_higher_index)
+        if length(identifiers_higher) > 0
+            node_higher = PartitionNode(
+                BoundingBox(
+                    copy(node.bounding_box.coordinates_min),
+                    copy(node.bounding_box.coordinates_max),
+                ),
+                Int[],
+                identifiers_higher,
+                depth_new,
+                0,
+            )
+            node_higher.bounding_box.coordinates_min[dim_split] = coordinate_split
+            push!(partition, node_higher)
+            node_higher_index = length(partition)
+            push!(node.child_indices, node_higher_index)
 
-        # If there are sufficient shapes in the child node and the maximum depth has not been exceeded,
-        # add the child node to the stack
-        if length(names_higher) > max_shapes_per_node && depth_new < max_depth
-            push!(nodes_to_process, node_higher_index)
+            # If there are sufficient shapes in the child node and the maximum depth has not been exceeded,
+            # add the child node to the stack
+            if length(identifiers_higher) > max_objects_per_node && depth_new < max_depth
+                push!(nodes_to_process, node_higher_index)
+            end
         end
     end
+    return nothing
+end
+
+function partition!(
+    scene::Scene{F};
+    max_objects_per_node::Int = 3,
+    max_depth::Int = 5,
+)::Nothing where {F}
+    (; shapes, partition) = scene
+
+    # Get the bounding boxes of all shapes in the scene
+    bounding_boxes::Dict{Symbol,BoundingBox{F}} =
+        Dict(name => get_bounding_box(scene, name) for (name, shape) ∈ shapes)
+
+    partition!(partition, bounding_boxes; max_objects_per_node, max_depth)
+    return nothing
+end
+
+function partition!(
+    shape::TriangleShape{F};
+    max_objects_per_node::Int = 3,
+    max_depth::Int = 5,
+)::Nothing where {F}
+    (; vertices, faces, partition, n_faces) = shape
+
+    # First collect the bouding boxes in a vector,
+    # which is thread-safe
+    bounding_boxes_vector = Vector{BoundingBox}(undef, n_faces)
+    @batch for face_index ∈ 1:n_faces
+        triangle_vertices = view(vertices, view(faces, face_index, :), :)
+        bounding_box = BoundingBox(
+            minimum(triangle_vertices, dims = 1)[:],
+            maximum(triangle_vertices, dims = 1)[:],
+        )
+
+        bounding_boxes_vector[face_index] = bounding_box
+    end
+
+    bounding_boxes =
+        Dict(i => bounding_box for (i, bounding_box) ∈ enumerate(bounding_boxes_vector))
+    partition!(partition, bounding_boxes; max_objects_per_node, max_depth)
+    return nothing
+end
+
+function partition!(
+    scene::Scene,
+    name::Symbol;
+    max_objects_per_node::Int = 3,
+    max_depth::Int = 5,
+)::Nothing
+    shape = scene.shapes[name]
+    partition!(shape; max_objects_per_node, max_depth)
     return nothing
 end

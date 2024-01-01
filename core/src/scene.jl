@@ -19,7 +19,7 @@ struct Scene{
     # Intersection data of rays with shapes
     intersections::Intersection{F,MF,MI}
     # Partition of scene for efficient intersection computations
-    partition::Vector{PartitionNode{F}}
+    partition::Vector{PartitionNode{F,Symbol}}
 end
 
 """
@@ -85,7 +85,7 @@ function Scene(;
     intersectors = Dict{Symbol,Intersector{VFS,VIS}}()
     texturers = Dict{Symbol,Texturer{VFS,VIS}}()
     intersections = Intersection(nthreads(); matrix_prototype)
-    partition = Vector{PartitionNode{F}}()
+    partition = Vector{PartitionNode{F,Symbol}}()
     return Scene(
         cameras,
         shapes,

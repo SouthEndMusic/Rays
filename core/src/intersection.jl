@@ -347,28 +347,58 @@ function _intersect_ray!(
     ray_dir::VF,
     shape::TriangleShape{F},
 )::Bool where {F<:AbstractFloat,VF<:AbstractVector{F}}
-    (; vertices, faces, normals) = shape
+    (; vertices, faces, normals, partition) = shape
 
     closer_intersection_found = false
 
-    for i ∈ 1:shape.n_faces
-        triangle_vertices = view(vertices, view(faces, i, :), :)
-        normal = view(normals, i, :)
-        t_int_candidate = _intersect_ray!(
-            ray_loc,
-            ray_dir,
-            cache_float,
-            triangle_vertices;
-            normal,
-            t_int_prev = t[1],
-        )
-        if t_int_candidate < t[1]
-            closer_intersection_found = true
-            t[1] = t_int_candidate
-            cache_int[1] = i
+    if isempty(partition)
+        for face_index ∈ 1:shape.n_faces
+            triangle_vertices = view(vertices, view(faces, face_index, :), :)
+            normal = view(normals, face_index, :)
+            t_int_candidate = _intersect_ray!(
+                ray_loc,
+                ray_dir,
+                cache_float,
+                triangle_vertices;
+                normal,
+                t_int_prev = t[1],
+            )
+            if t_int_candidate < t[1]
+                closer_intersection_found = true
+                t[1] = t_int_candidate
+                cache_int[1] = face_index
+            end
+        end
+    else
+        nodes_to_process = [1]
+        while !isempty(nodes_to_process)
+            node_index = pop!(nodes_to_process)
+            node = partition[node_index]
+            if bounding_box_intersect(ray_loc, ray_dir, node.bounding_box)
+                if isempty(node.child_indices)
+                    for face_index ∈ node.identifiers
+                        triangle_vertices = view(vertices, view(faces, face_index, :), :)
+                        normal = view(normals, face_index, :)
+                        t_int_candidate = _intersect_ray!(
+                            ray_loc,
+                            ray_dir,
+                            cache_float,
+                            triangle_vertices;
+                            normal,
+                            t_int_prev = t[1],
+                        )
+                        if t_int_candidate < t[1]
+                            closer_intersection_found = true
+                            t[1] = t_int_candidate
+                            cache_int[1] = face_index
+                        end
+                    end
+                else
+                    append!(nodes_to_process, node.child_indices)
+                end
+            end
         end
     end
-
     return closer_intersection_found
 end
 

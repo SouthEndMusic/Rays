@@ -93,6 +93,7 @@ struct TriangleShape{F} <: Shape{F}
     n_vertices::Int
     n_faces::Int
     convex::Bool
+    partition::Vector{PartitionNode{F,Int}}
 end
 
 """
@@ -120,7 +121,17 @@ function TriangleShape(
         name = snake_case_name(TriangleShape)
     end
 
-    return TriangleShape(name, vertices, faces, normals, n_vertices, n_faces, convex)
+    partition = Vector{PartitionNode{F,Int}}()
+    return TriangleShape(
+        name,
+        vertices,
+        faces,
+        normals,
+        n_vertices,
+        n_faces,
+        convex,
+        partition,
+    )
 end
 
 function Base.show(io::IO, triangle_shape::TriangleShape)::Nothing

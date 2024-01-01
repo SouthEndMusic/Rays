@@ -139,18 +139,18 @@ end
 """
 Node in the scene partition graph.
 bounding_box: The bounding box corresponding to this node
-children: The indices of nodes with bounding boxes contained in the bounding
+child_indices: The indices of nodes with bounding boxes contained in the bounding
 	box of this node
-shape_names: The names of the shapes whose bounding box intersects the bounding
-	box of this node
+identifiers: The identifiers of the objects within the bounding box of this node.
+	e.g. for a scene partition these are shape names, for a TriangleShape these are triangle indices.
 depth: the depth in the graph of this node
 dim_split: The dimension along which the bounding box of this node was split to
 	form child nodes (if this node is a leaf-node then dim_split = 0)
 """
-struct PartitionNode{F<:AbstractFloat}
+struct PartitionNode{F<:AbstractFloat,T}
     bounding_box::BoundingBox{F}
-    children::Vector{Int}
-    shape_names::Vector{Symbol}
+    child_indices::Vector{Int}
+    identifiers::Vector{T}
     depth::Int
     dim_split::Int
 end

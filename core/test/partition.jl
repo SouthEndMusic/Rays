@@ -30,7 +30,7 @@ end
         push!(scene, cube; transform)
     end
 
-    Rays.partition_scene!(scene)
+    Rays.partition!(scene)
     function overlap(box_1::Rays.BoundingBox, box_2::Rays.BoundingBox)::Bool
         for dim ∈ 1:3
             min_of_max = min(box_1.coordinates_max[dim], box_2.coordinates_max[dim])
@@ -45,7 +45,7 @@ end
     for node ∈ scene.partition
         @test all(
             overlap(node.bounding_box, Rays.get_bounding_box(scene, name)) for
-            name ∈ node.shape_names
+            name ∈ node.identifiers
         )
     end
 
@@ -56,16 +56,16 @@ end
 
     names_in_endnodes = Set{Symbol}()
     for node ∈ scene.partition
-        if isempty(node.children)
-            union!(names_in_endnodes, node.shape_names)
+        if isempty(node.child_indices)
+            union!(names_in_endnodes, node.identifiers)
         end
     end
     @test names_in_endnodes == Set(keys(scene.shapes))
 
     for node ∈ scene.partition
         if node.dim_split != 0
-            child_node_1 = scene.partition[node.children[1]]
-            child_node_2 = scene.partition[node.children[2]]
+            child_node_1 = scene.partition[node.child_indices[1]]
+            child_node_2 = scene.partition[node.child_indices[2]]
             @test child_node_1.bounding_box.coordinates_max[node.dim_split] ==
                   child_node_2.bounding_box.coordinates_min[node.dim_split]
         end
