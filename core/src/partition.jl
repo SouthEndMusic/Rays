@@ -87,13 +87,16 @@ bounding_boxes: dictionary identifier => bounding_box
 max_objects_per_node: stop bisecting if a bounding box contains at most this amount
 	of objects
 max_depth: maximum depth of the bisection tree
+eps: makes bounding boxes effectively a bit larger, prevents bugs
 """
 function partition!(
     partition::Vector{PartitionNode{F,T}},
     bounding_boxes::Dict{T,BoundingBox{F}};
     max_objects_per_node::Int = 3,
     max_depth::Int = 5,
+    eps::AbstractFloat = 1e-3,
 )::Nothing where {F,T}
+    eps = F(eps)
 
     # Get the centers of all bounding boxes
     bounding_box_centers::Dict{T,Vector{F}} = Dict(
@@ -149,10 +152,12 @@ function partition!(
         identifiers_lower = Vector{T}()
         identifiers_higher = Vector{T}()
         for identifier ∈ node.identifiers
-            if bounding_boxes[identifier].coordinates_min[dim_split] < coordinate_split
+            if bounding_boxes[identifier].coordinates_min[dim_split] - eps <
+               coordinate_split
                 push!(identifiers_lower, identifier)
             end
-            if bounding_boxes[identifier].coordinates_max[dim_split] > coordinate_split
+            if bounding_boxes[identifier].coordinates_max[dim_split] + eps >
+               coordinate_split
                 push!(identifiers_higher, identifier)
             end
         end
@@ -214,6 +219,7 @@ function partition!(
     scene::Scene{F};
     max_objects_per_node::Int = 3,
     max_depth::Int = 5,
+    eps::AbstractFloat = 1e-3,
 )::Nothing where {F}
     (; shapes, partition) = scene
 
@@ -221,7 +227,7 @@ function partition!(
     bounding_boxes::Dict{Symbol,BoundingBox{F}} =
         Dict(name => get_bounding_box(scene, name) for (name, shape) ∈ shapes)
 
-    partition!(partition, bounding_boxes; max_objects_per_node, max_depth)
+    partition!(partition, bounding_boxes; max_objects_per_node, max_depth, eps)
     return nothing
 end
 
@@ -229,6 +235,7 @@ function partition!(
     shape::TriangleShape{F};
     max_objects_per_node::Int = 3,
     max_depth::Int = 5,
+    eps::AbstractFloat = 1e-3,
 )::Nothing where {F}
     (; vertices, faces, partition, n_faces) = shape
 
@@ -247,7 +254,7 @@ function partition!(
 
     bounding_boxes =
         Dict(i => bounding_box for (i, bounding_box) ∈ enumerate(bounding_boxes_vector))
-    partition!(partition, bounding_boxes; max_objects_per_node, max_depth)
+    partition!(partition, bounding_boxes; max_objects_per_node, max_depth, eps)
     return nothing
 end
 
@@ -256,8 +263,9 @@ function partition!(
     name::Symbol;
     max_objects_per_node::Int = 3,
     max_depth::Int = 5,
+    eps::AbstractFloat = 1e-3,
 )::Nothing
     shape = scene.shapes[name]
-    partition!(shape; max_objects_per_node, max_depth)
+    partition!(shape; max_objects_per_node, max_depth, eps)
     return nothing
 end
