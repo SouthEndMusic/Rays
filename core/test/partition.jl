@@ -71,3 +71,40 @@ end
         end
     end
 end
+
+@testset "TriangleShape_partition" begin
+    seed!(1415)
+
+    scene = Rays.Scene()
+    camera = Rays.Camera(; screen_res = (100, 100))
+    push!(scene, camera)
+    from = Float32[2.5, 0, 0]
+    to = zeros(Float32, 3)
+    Rays.look_at!(camera, from, to)
+
+    N = 100
+    vertices = zeros(Float32, 3 * N, 3)
+    faces = zeros(Int, N, 3)
+    face_loc = zeros(Float32, 3)
+    for i ∈ 1:N
+        offset = (i - 1) * 3
+        faces[i, :] = [1, 2, 3] .+ offset
+        face_loc[2:3] = 2.0f0 * rand(Float32, 2) .- 1.0f0
+        for j ∈ 1:3
+            perturbation = 0.1 * (2.0f0 * rand(Float32, 3) .- 1.0f0)
+            vertices[offset+j, :] .= face_loc + perturbation
+        end
+    end
+    triangle_shape = Rays.TriangleShape(vertices, faces, name = :donut)
+    push!(scene, triangle_shape)
+
+    @test isempty(triangle_shape.partition)
+    Rays.render!(scene)
+    canvas_without_partition = copy(camera.canvas[1, :, :])
+
+    Rays.partition!(triangle_shape)
+    @test !isempty(triangle_shape.partition)
+    Rays.render!(scene)
+    canvas_with_partition = camera.canvas[1, :, :]
+    @test canvas_without_partition == canvas_with_partition
+end
