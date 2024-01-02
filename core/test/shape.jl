@@ -204,7 +204,7 @@ end
     faces = [1 2 3;]
     triangle = Rays.TriangleShape(vertices, faces; name = :my_awesome_triangle)
     @test string(triangle) ==
-          "<TriangleShape 'my_awesome_triangle'; with 3 vertices and 1 faces>"
+          "<TriangleShape 'my_awesome_triangle'; with 3 vertices and 1 faces, unpartitioned>"
 
     bounding_box = Rays.get_bounding_box(triangle)
     @test bounding_box.coordinates_min ≈ Float32[0, 0, 0]
