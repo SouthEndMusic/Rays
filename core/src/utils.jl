@@ -154,3 +154,53 @@ struct PartitionNode{F<:AbstractFloat,T}
     depth::Int
     dim_split::Int
 end
+
+struct Partition{F<:AbstractFloat,T}
+    partition_nodes::Vector{PartitionNode{F,T}}
+end
+
+function Base.show(io::IO, partition::Partition)::Nothing
+    (; partition_nodes) = partition
+    if isempty(partition_nodes)
+        print(io, "<Partition; empty>")
+        return nothing
+    end
+
+    n_leaf_nodes_per_depth = Dict{Int,Int}()
+    max_objects_per_leaf_node = 0
+    mean_objects_per_leaf_node = 0.0
+
+    for node ∈ partition_nodes
+        # Check whether this is a leaf node
+        if length(node.child_indices) == 0
+            if node.depth ∉ keys(n_leaf_nodes_per_depth)
+                n_leaf_nodes_per_depth[node.depth] = 0
+            end
+            n_leaf_nodes_per_depth[node.depth] += 1
+            n_objects = length(node.identifiers)
+            max_objects_per_leaf_node = max(max_objects_per_leaf_node, n_objects)
+            mean_objects_per_leaf_node += n_objects
+        end
+    end
+
+    n_objects = length(partition_nodes[1].identifiers)
+    n_leaf_nodes = sum(values(n_leaf_nodes_per_depth))
+    mean_objects_per_leaf_node /= n_leaf_nodes
+    mean_objects_per_leaf_node = Int(round(mean_objects_per_leaf_node))
+
+    # print(
+    # 	io,
+    # 	"<Partition; leaf nodes: per depth $n_leaf_nodes_per_depth, mean no. objects $max_objects_per_leaf_node, max no. objects $max_objects_per_leaf_node>",
+    # )
+    print(io, "<Partition;")
+    print(io, "\n\t total number of objects: ", n_objects)
+    print(io, ",\n\t number of leaf nodes: ", n_leaf_nodes)
+    print(io, ",\n\t average number of objects per leaf node: ", mean_objects_per_leaf_node)
+    print(io, ",\n\t maximum number of objects per leaf node: ", max_objects_per_leaf_node)
+    print(io, ",\n\t number of leaf nodes per depth:")
+    for depth ∈ sort(collect(keys(n_leaf_nodes_per_depth)))
+        print(io, "\n\t\t", depth, ": ", n_leaf_nodes_per_depth[depth])
+    end
+    print(io, "\n>")
+    return nothing
+end

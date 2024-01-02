@@ -348,10 +348,11 @@ function _intersect_ray!(
     shape::TriangleShape{F},
 )::Bool where {F<:AbstractFloat,VF<:AbstractVector{F}}
     (; vertices, faces, normals, partition) = shape
+    (; partition_nodes) = partition
 
     closer_intersection_found = false
 
-    if isempty(partition)
+    if isempty(partition_nodes)
         for face_index ∈ 1:shape.n_faces
             triangle_vertices = view(vertices, view(faces, face_index, :), :)
             normal = view(normals, face_index, :)
@@ -373,7 +374,7 @@ function _intersect_ray!(
         nodes_to_process = [1]
         while !isempty(nodes_to_process)
             node_index = pop!(nodes_to_process)
-            node = partition[node_index]
+            node = partition_nodes[node_index]
             if bounding_box_intersect(ray_loc, ray_dir, node.bounding_box)
                 if isempty(node.child_indices)
                     for face_index ∈ node.identifiers

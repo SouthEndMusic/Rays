@@ -1,30 +1,30 @@
-abstract type Shape{F <: AbstractFloat} end
+abstract type Shape{F<:AbstractFloat} end
 
 struct Sphere{F} <: Shape{F}
-	name::Symbol
-	R::F
-	Rsq::F
+    name::Symbol
+    R::F
+    Rsq::F
 end
 
 Sphere(R::F) where {F} = Sphere(snake_case_name(Sphere), R, R^2)
 
 function Base.show(io::IO, sphere::Sphere)::Nothing
-	(; name) = sphere
-	print(io, "<Sphere \'$name\'>")
-	return nothing
+    (; name) = sphere
+    print(io, "<Sphere \'$name\'>")
+    return nothing
 end
 
 struct Cube{F} <: Shape{F}
-	name::Symbol
-	R::F
+    name::Symbol
+    R::F
 end
 
 Cube(R::F) where {F} = Cube(snake_case_name(Cube), R)
 
 function Base.show(io::IO, cube::Cube)::Nothing
-	(; name) = cube
-	print(io, "<Cube \'$name\'>")
-	return nothing
+    (; name) = cube
+    print(io, "<Cube \'$name\'>")
+    return nothing
 end
 
 """
@@ -34,19 +34,19 @@ depth: the maximal recursion depth
 shrink_factor: the factor by which all lengths decrease for a substitution
 subshapes: the set of shapes that a shape is substituted with for a recursion step
 """
-struct FractalShape{F, S <: Shape{F}, T <: RayTransform{F}} <: Shape{F}
-	name::Symbol
-	depth::Int
-	shape::S
-	subshape_transforms::Vector{T}
+struct FractalShape{F,S<:Shape{F},T<:RayTransform{F}} <: Shape{F}
+    name::Symbol
+    depth::Int
+    shape::S
+    subshape_transforms::Vector{T}
 end
 
 function Base.show(io::IO, fractal_shape::FractalShape)::Nothing
-	(; name, subshape_transforms, shape) = fractal_shape
-	print(
-		io,
-		"<FractalShape \'$name\'; $(length(subshape_transforms)) subshapes of $shape>",
-	)
+    (; name, subshape_transforms, shape) = fractal_shape
+    print(
+        io,
+        "<FractalShape \'$name\'; $(length(subshape_transforms)) subshapes of $shape>",
+    )
 end
 
 """
@@ -54,26 +54,26 @@ construct a Menger sponge of given location, size and recursion depth,
 with the subshapes array automatically generated.
 """
 function menger_sponge(
-	R::F,
-	depth::Int,
-)::FractalShape{F, Cube{F}, AffineTransform{F, F, Missing, Vector{F}}} where {F}
-	subcube_transforms = AffineTransform{F, F, Missing, Vector{F}}[]
-	R_subcube = R / 3
+    R::F,
+    depth::Int,
+)::FractalShape{F,Cube{F},AffineTransform{F,F,Missing,Vector{F}}} where {F}
+    subcube_transforms = AffineTransform{F,F,Missing,Vector{F}}[]
+    R_subcube = R / 3
 
-	for ordinals ∈ Iterators.product(1:3, 1:3, 1:3)
-		ordinals = collect(ordinals)
-		if count(x -> x == 2, ordinals) > 1
-			continue
-		end
-		center_subcube = (ordinals .- 2) * 2 * R_subcube
-		center_subcube = convert(Vector{F}, center_subcube)
+    for ordinals ∈ Iterators.product(1:3, 1:3, 1:3)
+        ordinals = collect(ordinals)
+        if count(x -> x == 2, ordinals) > 1
+            continue
+        end
+        center_subcube = (ordinals .- 2) * 2 * R_subcube
+        center_subcube = convert(Vector{F}, center_subcube)
 
-		push!(
-			subcube_transforms,
-			AffineTransform(F(1 / 3), missing, missing, center_subcube),
-		)
-	end
-	return FractalShape(:menger_sponge, depth, Cube(R), subcube_transforms)
+        push!(
+            subcube_transforms,
+            AffineTransform(F(1 / 3), missing, missing, center_subcube),
+        )
+    end
+    return FractalShape(:menger_sponge, depth, Cube(R), subcube_transforms)
 end
 
 """
@@ -86,97 +86,101 @@ n_faces: the number of faces
 convex: Whether the triangles enclose a convex volume.
 """
 struct TriangleShape{F} <: Shape{F}
-	name::Symbol
-	vertices::Matrix{F} # (n_vertices, 3)
-	faces::Matrix{Int} # (n_faces, 3)
-	normals::Matrix{F} # (n_faces, 3)
-	n_vertices::Int
-	n_faces::Int
-	convex::Bool
-	partition::Vector{PartitionNode{F, Int}}
+    name::Symbol
+    vertices::Matrix{F} # (n_vertices, 3)
+    faces::Matrix{Int} # (n_faces, 3)
+    normals::Matrix{F} # (n_faces, 3)
+    n_vertices::Int
+    n_faces::Int
+    convex::Bool
+    partition::Partition{F,Int}
 end
 
 """
 Construct a triangle shape where the normals are computed automatically from the vertices.
 """
 function TriangleShape(
-	vertices::Matrix{F},
-	faces::Matrix{Int};
-	convex::Bool = false,
-	name::Union{Symbol, Nothing} = nothing,
+    vertices::Matrix{F},
+    faces::Matrix{Int};
+    convex::Bool = false,
+    name::Union{Symbol,Nothing} = nothing,
 )::TriangleShape{F} where {F}
-	n_vertices = size(vertices)[1]
-	n_faces = size(faces)[1]
-	normals = zeros(F, n_faces, 3)
+    n_vertices = size(vertices)[1]
+    n_faces = size(faces)[1]
+    normals = zeros(F, n_faces, 3)
 
-	@batch for i ∈ 1:n_faces
-		u = vertices[faces[i, 1], :] - vertices[faces[i, 3], :]
-		v = vertices[faces[i, 2], :] - vertices[faces[i, 3], :]
-		n = cross(u, v)
-		normalize!(n)
-		normals[i, :] = n
-	end
+    @batch for i ∈ 1:n_faces
+        u = vertices[faces[i, 1], :] - vertices[faces[i, 3], :]
+        v = vertices[faces[i, 2], :] - vertices[faces[i, 3], :]
+        n = cross(u, v)
+        normalize!(n)
+        normals[i, :] = n
+    end
 
-	if isnothing(name)
-		name = snake_case_name(TriangleShape)
-	end
+    if isnothing(name)
+        name = snake_case_name(TriangleShape)
+    end
 
-	partition = Vector{PartitionNode{F, Int}}()
-	return TriangleShape(
-		name,
-		vertices,
-		faces,
-		normals,
-		n_vertices,
-		n_faces,
-		convex,
-		partition,
-	)
+    partition = Partition(Vector{PartitionNode{F,Int}}())
+    return TriangleShape(
+        name,
+        vertices,
+        faces,
+        normals,
+        n_vertices,
+        n_faces,
+        convex,
+        partition,
+    )
 end
 
 function Base.show(io::IO, triangle_shape::TriangleShape)::Nothing
-	(; name, n_vertices, n_faces, partition) = triangle_shape
-	has_partition = isempty(partition) ? "unpartitioned" : "partitioned"
-	print(io, "<TriangleShape \'$name\'; with $n_vertices vertices and $n_faces faces, $has_partition>")
-	return nothing
+    (; name, n_vertices, n_faces, partition) = triangle_shape
+    (; partition_nodes) = partition
+    has_partition = isempty(partition_nodes) ? "unpartitioned" : "partitioned"
+    print(
+        io,
+        "<TriangleShape \'$name\'; with $n_vertices vertices and $n_faces faces, $has_partition>",
+    )
+    return nothing
 end
 
 """
 Construct a tetrahedron as a triangle shape with given radius.
 """
 function Tetrahedron(R::F)::TriangleShape{F} where {F}
-	vertices = zeros(F, 4, 3)
-	vertices[4, :] .= [0.0, 0.0, R]
+    vertices = zeros(F, 4, 3)
+    vertices[4, :] .= [0.0, 0.0, R]
 
-	ϕ = π - acos(1 / 3)
-	for (i, θ) ∈ enumerate(range(0, 2π, 4)[1:end-1])
-		@. vertices[i, :] = R * [
-			cos(θ) * sin(ϕ)
-			sin(θ) * sin(ϕ)
-			cos(ϕ)
-		]
-	end
+    ϕ = π - acos(1 / 3)
+    for (i, θ) ∈ enumerate(range(0, 2π, 4)[1:end-1])
+        @. vertices[i, :] = R * [
+            cos(θ) * sin(ϕ)
+            sin(θ) * sin(ϕ)
+            cos(ϕ)
+        ]
+    end
 
-	faces = [1 3 2; 1 2 4; 1 4 3; 2 3 4]
+    faces = [1 3 2; 1 2 4; 1 4 3; 2 3 4]
 
-	return TriangleShape(vertices, faces; convex = true, name = :tetrahedron)
+    return TriangleShape(vertices, faces; convex = true, name = :tetrahedron)
 end
 
 """
 Construct a Sierpinski pyramid of given location, size and recursion depth,
 with the subshapes array automatically generated.
 """
-function sierpinski_pyramid(R::F, depth::Int)::FractalShape{F, TriangleShape{F}} where {F}
-	subtetrahedron_transforms = AffineTransform{F, F, Missing, Vector{F}}[]
-	tetrahedron = Tetrahedron(R)
-	for i ∈ 1:4
-		center_subtetrahedron = tetrahedron.vertices[i, :] / 2
-		subtetrahedron_transform =
-			AffineTransform(F(1 / 2), missing, missing, center_subtetrahedron)
-		push!(subtetrahedron_transforms, subtetrahedron_transform)
-	end
+function sierpinski_pyramid(R::F, depth::Int)::FractalShape{F,TriangleShape{F}} where {F}
+    subtetrahedron_transforms = AffineTransform{F,F,Missing,Vector{F}}[]
+    tetrahedron = Tetrahedron(R)
+    for i ∈ 1:4
+        center_subtetrahedron = tetrahedron.vertices[i, :] / 2
+        subtetrahedron_transform =
+            AffineTransform(F(1 / 2), missing, missing, center_subtetrahedron)
+        push!(subtetrahedron_transforms, subtetrahedron_transform)
+    end
 
-	return FractalShape(:sierpinski_pyramid, depth, tetrahedron, subtetrahedron_transforms)
+    return FractalShape(:sierpinski_pyramid, depth, tetrahedron, subtetrahedron_transforms)
 end
 
 """
@@ -200,17 +204,17 @@ itermax: The maximum amount of Newton iterations used to find
 	a zero of f along a ray within the specified tolerance
 """
 struct ImplicitSurface{
-	F <: AbstractFloat,
-	MF <: AbstractMatrix{F},
-	VecF <: Union{VectorField{TypedSubArray{F, MF, Base.Slice{Base.OneTo{Int64}}}}, Nothing},
+    F<:AbstractFloat,
+    MF<:AbstractMatrix{F},
+    VecF<:Union{VectorField{TypedSubArray{F,MF,Base.Slice{Base.OneTo{Int64}}}},Nothing},
 } <: Shape{F}
-	name::Symbol
-	f::ScalarField{UnitRange{Int64}, F, MF}
-	∇f!::VecF
-	R_bound::F
-	n_divisions::Int
-	tol::F
-	itermax::Int
+    name::Symbol
+    f::ScalarField{UnitRange{Int64},F,MF}
+    ∇f!::VecF
+    R_bound::F
+    n_divisions::Int
+    tol::F
+    itermax::Int
 end
 
 """
@@ -218,45 +222,45 @@ Construct an implicit surface with optional rootfinding
 parameters.
 """
 function ImplicitSurface(
-	f::Function;
-	∇f!::Union{Function, Nothing} = nothing,
-	R_bound::Union{F, Nothing} = nothing,
-	name::Union{Symbol, Nothing} = nothing,
-	itermax::Int = 10,
-	n_divisions::Int = 3,
-	tol::Union{F, Nothing} = nothing,
-	vector_prototype::AbstractVector{F} = zeros(Float32, 3),
-)::ImplicitSurface where {F <: AbstractFloat}
-	if isnothing(name)
-		name = snake_case_name(ImplicitSurface)
-	end
-	if isnothing(R_bound)
-		R_bound = convert(F, 2.0)
-	end
-	if isnothing(tol)
-		tol = convert(F, 1e-3)
-	end
+    f::Function;
+    ∇f!::Union{Function,Nothing} = nothing,
+    R_bound::Union{F,Nothing} = nothing,
+    name::Union{Symbol,Nothing} = nothing,
+    itermax::Int = 10,
+    n_divisions::Int = 3,
+    tol::Union{F,Nothing} = nothing,
+    vector_prototype::AbstractVector{F} = zeros(Float32, 3),
+)::ImplicitSurface where {F<:AbstractFloat}
+    if isnothing(name)
+        name = snake_case_name(ImplicitSurface)
+    end
+    if isnothing(R_bound)
+        R_bound = convert(F, 2.0)
+    end
+    if isnothing(tol)
+        tol = convert(F, 1e-3)
+    end
 
-	VF = typeof(vector_prototype)
-	MF = typeof(similar(vector_prototype, (3, 3)))
-	ST = UnitRange{Int64}
-	return ImplicitSurface(
-		name,
-		ScalarField{ST, F, MF}(f),
-		isnothing(∇f!) ? nothing : VectorField{F, VF}(∇f!),
-		R_bound,
-		n_divisions,
-		tol,
-		itermax,
-	)
+    VF = typeof(vector_prototype)
+    MF = typeof(similar(vector_prototype, (3, 3)))
+    ST = UnitRange{Int64}
+    return ImplicitSurface(
+        name,
+        ScalarField{ST,F,MF}(f),
+        isnothing(∇f!) ? nothing : VectorField{F,VF}(∇f!),
+        R_bound,
+        n_divisions,
+        tol,
+        itermax,
+    )
 end
 
 function Base.show(io::IO, implicit_surface::ImplicitSurface)::Nothing
-	(; name, f, ∇f!) = implicit_surface
-	gradient_descr =
-		isnothing(∇f!) ? "finite difference gradient" : "gradient \'$(∇f!.obj.x)\'"
-	print(io, "<ImplicitSurface \'$name\'; function \'$(f.obj.x)\' and $gradient_descr>")
-	return nothing
+    (; name, f, ∇f!) = implicit_surface
+    gradient_descr =
+        isnothing(∇f!) ? "finite difference gradient" : "gradient \'$(∇f!.obj.x)\'"
+    print(io, "<ImplicitSurface \'$name\'; function \'$(f.obj.x)\' and $gradient_descr>")
+    return nothing
 end
 
 """
@@ -277,16 +281,16 @@ tol: The tolerance of approximating a zero of r:
 itermax: The maximum amount of Newton iterations used to find 
 	a crossing of r along a ray within the specified tolerance
 """
-struct RevolutionSurface{F, SF <: Union{ScalarFunc{F}, Nothing}} <: Shape{F}
-	name::Symbol
-	r::ScalarFunc{F}
-	dr::SF
-	r_max::F
-	z_min::F
-	z_max::F
-	n_divisions::Int
-	tol::F
-	itermax::Int
+struct RevolutionSurface{F,SF<:Union{ScalarFunc{F},Nothing}} <: Shape{F}
+    name::Symbol
+    r::ScalarFunc{F}
+    dr::SF
+    r_max::F
+    z_min::F
+    z_max::F
+    n_divisions::Int
+    tol::F
+    itermax::Int
 end
 
 """
@@ -294,38 +298,38 @@ Construct a revolution surface with optional rootfinding
 parameters.
 """
 function RevolutionSurface(
-	r::Function,
-	r_max::F,
-	z_min::F,
-	z_max::F;
-	dr::Union{Function, Nothing} = nothing,
-	name::Union{Symbol, Nothing} = nothing,
-	itermax::Int = 10,
-	n_divisions::Int = 3,
-	tol::Union{F, Nothing} = nothing,
+    r::Function,
+    r_max::F,
+    z_min::F,
+    z_max::F;
+    dr::Union{Function,Nothing} = nothing,
+    name::Union{Symbol,Nothing} = nothing,
+    itermax::Int = 10,
+    n_divisions::Int = 3,
+    tol::Union{F,Nothing} = nothing,
 )::RevolutionSurface{F} where {F}
-	if isnothing(name)
-		name = snake_case_name(RevolutionSurface)
-	end
-	if isnothing(tol)
-		tol = convert(F, 1e-3)
-	end
-	return RevolutionSurface(
-		name,
-		ScalarFunc{F}(r),
-		isnothing(dr) ? nothing : ScalarFunc{F}(dr),
-		r_max,
-		z_min,
-		z_max,
-		n_divisions,
-		tol,
-		itermax,
-	)
+    if isnothing(name)
+        name = snake_case_name(RevolutionSurface)
+    end
+    if isnothing(tol)
+        tol = convert(F, 1e-3)
+    end
+    return RevolutionSurface(
+        name,
+        ScalarFunc{F}(r),
+        isnothing(dr) ? nothing : ScalarFunc{F}(dr),
+        r_max,
+        z_min,
+        z_max,
+        n_divisions,
+        tol,
+        itermax,
+    )
 end
 
 function Base.show(io::IO, implicit_surface::RevolutionSurface)::Nothing
-	(; name, r, dr) = implicit_surface
-	dr_descr = isnothing(dr) ? "finite difference derivative" : "derivative \'$(dr.obj.x)\'"
-	print(io, "<RevolutionSurface \'$name\'; function \'$(r.obj.x)\' and $dr_descr>")
-	return nothing
+    (; name, r, dr) = implicit_surface
+    dr_descr = isnothing(dr) ? "finite difference derivative" : "derivative \'$(dr.obj.x)\'"
+    print(io, "<RevolutionSurface \'$name\'; function \'$(r.obj.x)\' and $dr_descr>")
+    return nothing
 end

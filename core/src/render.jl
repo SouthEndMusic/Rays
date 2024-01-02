@@ -183,6 +183,7 @@ Intersect shapes efficiently based on the scene partition.
 """
 function partition_intersector(scene::Scene)::Function
     (; partition, intersectors) = scene
+    (; partition_nodes) = partition
     return intersector!(
         t,
         ray_loc,
@@ -196,7 +197,7 @@ function partition_intersector(scene::Scene)::Function
         nodes_to_process = [1]
         while !isempty(nodes_to_process)
             node_index = pop!(nodes_to_process)
-            node = partition[node_index]
+            node = partition_nodes[node_index]
             if bounding_box_intersect(ray_camera_loc, ray_camera_dir, node.bounding_box)
                 if isempty(node.child_indices)
                     # Doing this instead of looping over node.identifiers
@@ -257,7 +258,7 @@ function render!(
 
     # Combine all intersectors in one function, 
     # this prevents runtime dispatch
-    if isempty(scene.partition)
+    if isempty(scene.partition.partition_nodes)
         intersectors! = combine_intersectors(intersectors)
     else
         intersectors! = partition_intersector(scene)

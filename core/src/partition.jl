@@ -90,12 +90,13 @@ max_depth: maximum depth of the bisection tree
 eps: makes bounding boxes effectively a bit larger, prevents bugs
 """
 function partition!(
-    partition::Vector{PartitionNode{F,T}},
+    partition::Partition{F,T},
     bounding_boxes::Dict{T,BoundingBox{F}};
     max_objects_per_node::Int = 3,
     max_depth::Int = 5,
     eps::AbstractFloat = 1e-3,
 )::Nothing where {F,T}
+    (; partition_nodes) = partition
     eps = F(eps)
 
     # Get the centers of all bounding boxes
@@ -117,19 +118,19 @@ function partition!(
     bounding_box_outter = BoundingBox(coordinates_min, coordinates_max)
 
     # Remove previous partition if it exists
-    empty!(partition)
+    empty!(partition_nodes)
 
     # Add the first node to the partition
     identifiers = collect(keys(bounding_boxes))
     node_first = PartitionNode(bounding_box_outter, Int[], identifiers, 0, 0)
-    push!(partition, node_first)
+    push!(partition_nodes, node_first)
 
     # Stack of nodes to process
     nodes_to_process = [1]
 
     while !isempty(nodes_to_process)
         node_index = pop!(nodes_to_process)
-        node = partition[node_index]
+        node = partition_nodes[node_index]
 
         if isempty(node.identifiers)
             continue
@@ -141,7 +142,7 @@ function partition!(
         dim_split = argmax(variances)
 
         node = @set node.dim_split = dim_split
-        partition[node_index] = node
+        partition_nodes[node_index] = node
 
         # Compute the position of the splitting plane as the median of the bounding box centers
         # of the shapes in this node in the splitting dimension
@@ -177,8 +178,8 @@ function partition!(
                 0,
             )
             node_lower.bounding_box.coordinates_max[dim_split] = coordinate_split
-            push!(partition, node_lower)
-            node_lower_index = length(partition)
+            push!(partition_nodes, node_lower)
+            node_lower_index = length(partition_nodes)
             push!(node.child_indices, node_lower_index)
 
             # If there are sufficient shapes in the child node and the maximum depth has not been exceeded,
@@ -201,8 +202,8 @@ function partition!(
                 0,
             )
             node_higher.bounding_box.coordinates_min[dim_split] = coordinate_split
-            push!(partition, node_higher)
-            node_higher_index = length(partition)
+            push!(partition_nodes, node_higher)
+            node_higher_index = length(partition_nodes)
             push!(node.child_indices, node_higher_index)
 
             # If there are sufficient shapes in the child node and the maximum depth has not been exceeded,
