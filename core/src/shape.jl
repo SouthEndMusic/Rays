@@ -93,6 +93,7 @@ struct TriangleShape{F} <: Shape{F}
     n_vertices::Int
     n_faces::Int
     convex::Bool
+    partition::Partition{F,Int}
 end
 
 """
@@ -120,12 +121,27 @@ function TriangleShape(
         name = snake_case_name(TriangleShape)
     end
 
-    return TriangleShape(name, vertices, faces, normals, n_vertices, n_faces, convex)
+    partition = Partition(Vector{PartitionNode{F,Int}}())
+    return TriangleShape(
+        name,
+        vertices,
+        faces,
+        normals,
+        n_vertices,
+        n_faces,
+        convex,
+        partition,
+    )
 end
 
 function Base.show(io::IO, triangle_shape::TriangleShape)::Nothing
-    (; name, n_vertices, n_faces) = triangle_shape
-    print(io, "<TriangleShape \'$name\'; with $n_vertices vertices and $n_faces faces>")
+    (; name, n_vertices, n_faces, partition) = triangle_shape
+    (; partition_nodes) = partition
+    has_partition = isempty(partition_nodes) ? "unpartitioned" : "partitioned"
+    print(
+        io,
+        "<TriangleShape \'$name\'; with $n_vertices vertices and $n_faces faces, $has_partition>",
+    )
     return nothing
 end
 
@@ -136,7 +152,7 @@ function Tetrahedron(R::F)::TriangleShape{F} where {F}
     vertices = zeros(F, 4, 3)
     vertices[4, :] .= [0.0, 0.0, R]
 
-    ϕ = 2π / 3
+    ϕ = π - acos(1 / 3)
     for (i, θ) ∈ enumerate(range(0, 2π, 4)[1:end-1])
         @. vertices[i, :] = R * [
             cos(θ) * sin(ϕ)
@@ -145,7 +161,7 @@ function Tetrahedron(R::F)::TriangleShape{F} where {F}
         ]
     end
 
-    faces = [1 2 3; 1 2 4; 1 3 4; 2 3 4]
+    faces = [1 3 2; 1 2 4; 1 4 3; 2 3 4]
 
     return TriangleShape(vertices, faces; convex = true, name = :tetrahedron)
 end

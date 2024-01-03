@@ -19,7 +19,7 @@ struct Scene{
     # Intersection data of rays with shapes
     intersections::Intersection{F,MF,MI}
     # Partition of scene for efficient intersection computations
-    partition::Vector{PartitionNode{F}}
+    partition::Partition{F,Symbol}
 end
 
 """
@@ -49,18 +49,25 @@ end
 
 function Base.show(io::IO, scene::Scene{F,MF})::Nothing where {F,MF}
     println(io, "Scene (array type $MF):")
+
+    println(io, "* Partition:")
+    println(io, "\t", scene.partition, "\n")
+
     println(io, "* Cameras:")
     for camera ∈ values(scene.cameras)
         println(io, "\t", camera)
     end
+
     println(io, "\n* Shapes:")
     for shape ∈ values(scene.shapes)
         println(io, "\t", shape)
     end
+
     println(io, "\n* Transforms:")
     for (name, transform) ∈ scene.transforms
         println(io, "\t", name, ": ", transform)
     end
+
     println(io, "\n* Textures:")
     for (name, texture) ∈ scene.textures
         println(io, "\t", name, ": ", texture)
@@ -85,7 +92,7 @@ function Scene(;
     intersectors = Dict{Symbol,Intersector{VFS,VIS}}()
     texturers = Dict{Symbol,Texturer{VFS,VIS}}()
     intersections = Intersection(nthreads(); matrix_prototype)
-    partition = Vector{PartitionNode{F}}()
+    partition = Partition(Vector{PartitionNode{F,Symbol}}())
     return Scene(
         cameras,
         shapes,

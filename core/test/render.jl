@@ -120,7 +120,7 @@ end
     @test camera.canvas[1, :, :] ≈
           readdlm(normpath(@__DIR__, "files/many_cubes_render.csv"), ',', Float32, '\n')
 
-    Rays.partition_scene!(scene)
+    Rays.partition!(scene)
     Rays.render!(scene)
     @test camera.canvas[1, :, :] ≈
           readdlm(normpath(@__DIR__, "files/many_cubes_render.csv"), ',', Float32, '\n')

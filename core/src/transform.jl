@@ -104,7 +104,7 @@ function Base.:∘(
 end
 
 """
-In-place forward application of an affine transform
+In-place forward application of an affine transform on a ray
 """
 function forward_transform!(
     loc_dst::VF,
@@ -130,7 +130,7 @@ function forward_transform!(
 end
 
 """
-Not in-place forward application of an affine transform
+Not in-place forward application of an affine transform on a ray
 """
 function forward_transform!(
     loc_dst::VF,
@@ -147,7 +147,7 @@ function forward_transform!(
 end
 
 """
-In-place inverse application of an affine transform
+In-place inverse application of an affine transform on a ray
 """
 function inverse_transform!(
     loc_dst::VF,
@@ -173,7 +173,7 @@ function inverse_transform!(
 end
 
 """
-Not in-place inverse application of an affine transform
+Not in-place inverse application of an affine transform on a ray
 """
 function inverse_transform!(
     loc_dst::VF,
@@ -186,5 +186,34 @@ function inverse_transform!(
     copyto!(loc_dst, loc_src)
     copyto!(dir_dst, dir_src)
     inverse_transform!(loc_dst, dir_dst, vec_temp, transform)
+    return nothing
+end
+
+"""
+In-place application of an affine transform on a n x 3 array of vertices
+"""
+function forward_transform!(
+    vertices::AbstractMatrix{F},
+    transform::AffineTransform{F},
+)::Nothing where {F}
+    (; scaling, rotation, translation) = transform
+    n_vertices = size(vertices)[1]
+
+    if !ismissing(scaling)
+        vertices *= scaling
+    end
+
+    if !ismissing(rotation)
+        for i ∈ 1:n_vertices
+            vertices[i, :] = rotation * vertices[i, :]
+        end
+    end
+
+    if !ismissing(translation)
+        for i ∈ 1:n_vertices
+            vertices[i, :] += translation
+        end
+    end
+
     return nothing
 end
