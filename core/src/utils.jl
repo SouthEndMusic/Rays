@@ -155,6 +155,9 @@ struct PartitionNode{F<:AbstractFloat,T}
     dim_split::Int
 end
 
+"""
+A partition consisting of a vector of partition nodes.
+"""
 struct Partition{F<:AbstractFloat,T}
     partition_nodes::Vector{PartitionNode{F,T}}
 end

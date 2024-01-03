@@ -353,6 +353,7 @@ function _intersect_ray!(
     closer_intersection_found = false
 
     if isempty(partition_nodes)
+        # If the TriangleShape is not partitioned, intersect all faces
         for face_index ∈ 1:shape.n_faces
             triangle_vertices = view(vertices, view(faces, face_index, :), :)
             normal = view(normals, face_index, :)
@@ -371,6 +372,7 @@ function _intersect_ray!(
             end
         end
     else
+        # If the TriangleShape is partitioned, use it
         nodes_to_process = [1]
         while !isempty(nodes_to_process)
             node_index = pop!(nodes_to_process)
